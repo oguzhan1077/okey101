@@ -2,9 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import Link from 'next/link';
 
 export default function Home() {
   const router = useRouter();
+  const { user, loading, signOut } = useAuth();
   const [gameMode, setGameMode] = useState<'group' | 'single' | null>(null);
   const [group1Name, setGroup1Name] = useState('');
   const [group2Name, setGroup2Name] = useState('');
@@ -41,9 +44,73 @@ export default function Home() {
     }
   };
 
+  // Loading durumu
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+        <div className="text-white text-xl">Yükleniyor...</div>
+      </div>
+    );
+  }
+
+  // Kullanıcı giriş yapmamışsa auth ekranları göster
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-8 text-center">
+            {/* Header */}
+            <div className="mb-8">
+              <h1 className="text-4xl font-bold text-white mb-2">101 Oyunu</h1>
+              <p className="text-gray-300">Dijital skor takip uygulaması</p>
+            </div>
+
+            {/* Auth Butonları */}
+            <div className="space-y-4">
+              <Link
+                href="/login"
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-6 rounded-xl font-semibold transition-colors shadow-lg hover:shadow-xl block"
+              >
+                🔐 Giriş Yap
+              </Link>
+              
+              <Link
+                href="/register"
+                className="w-full bg-green-600 hover:bg-green-500 text-white py-3 px-6 rounded-xl font-semibold transition-colors shadow-lg hover:shadow-xl block"
+              >
+                📝 Kayıt Ol
+              </Link>
+            </div>
+
+            {/* Info */}
+            <div className="mt-6 p-4 bg-blue-900/30 border border-blue-700 rounded-xl">
+              <p className="text-blue-300 text-sm">
+                Oyun geçmişinizi kaydetmek ve takip etmek için hesap oluşturun
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
       <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-8 w-full max-w-lg">
+        {/* Kullanıcı Bilgisi ve Çıkış */}
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <p className="text-sm text-gray-400">Hoş geldiniz</p>
+            <p className="text-white font-medium">{user.email}</p>
+          </div>
+          <button
+            onClick={signOut}
+            className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+          >
+            Çıkış
+          </button>
+        </div>
+
         {/* Başlık */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">101 Oyunu</h1>
