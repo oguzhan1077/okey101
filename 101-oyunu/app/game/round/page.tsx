@@ -190,6 +190,13 @@ export default function RoundPage() {
     // Round detaylarını localStorage'e kaydet
     const roundDetails = {
       round: gameData.currentRound,
+      mode: gameData.gameMode,
+      group1: gameData.group1Name,
+      group2: gameData.group2Name,
+      player1: gameData.players[0],
+      player2: gameData.players[1],
+      player3: gameData.players[2],
+      player4: gameData.players[3],
       players: gameData.players.map((name, index) => ({
         name,
         points: playerScores[index].points,

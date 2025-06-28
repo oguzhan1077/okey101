@@ -41,6 +41,8 @@ export default function GamePage() {
   const [gameEndData, setGameEndData] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editRoundData, setEditRoundData] = useState<RoundDetail | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<'finish' | 'newGame' | null>(null);
 
   useEffect(() => {
     // URL parametrelerinden oyun verilerini al
@@ -134,8 +136,6 @@ export default function GamePage() {
     setShowCalculation(true);
   };
 
-
-
   const getTotalScore = (playerIndex: number) => {
     return players[playerIndex]?.scores.reduce((sum, score) => sum + score, 0) || 0;
   };
@@ -152,14 +152,67 @@ export default function GamePage() {
     };
   };
 
+  // Oyuncu istatistiklerini hesapla
+  const getPlayerStats = (playerIndex: number) => {
+    let totalOkey = 0;
+    let totalFinish = 0;
+    let totalPenalty = 0;
+
+    roundDetails.forEach(round => {
+      const player = round.players[playerIndex];
+      if (player.hasOkey1 || player.hasOkey2) {
+        totalOkey++;
+      }
+      if (player.finished) {
+        totalFinish++;
+      }
+      if (player.penalty > 0) {
+        totalPenalty += player.penalty / 101; // Her 101 puan 1 ceza
+      }
+    });
+
+    return {
+      totalOkey,
+      totalFinish,
+      totalPenalty
+    };
+  };
+
   const finishGame = () => {
+    openConfirmModal('finish');
+  };
+
+  const openConfirmModal = (action: 'finish' | 'newGame') => {
+    setConfirmAction(action);
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmAction = () => {
+    if (confirmAction === 'finish') {
+      executeFinishGame();
+    } else if (confirmAction === 'newGame') {
+      executeNewGame();
+    }
+    setShowConfirmModal(false);
+    setConfirmAction(null);
+  };
+
+  const executeFinishGame = () => {
     const groupScores = getGroupScores();
+    
+    // Tüm oyuncular için istatistikleri hesapla
+    const playersWithStats = players.map((player, index) => ({
+      name: player.name,
+      score: getTotalScore(index),
+      originalIndex: index,
+      stats: getPlayerStats(index),
+      isGroup1: gameData?.gameMode === 'group' && (index === 0 || index === 2),
+      isGroup2: gameData?.gameMode === 'group' && (index === 1 || index === 3)
+    }));
+
     let endData: any = {
       isGroup: !!groupScores,
-      playerScores: players.map((player, index) => ({
-        name: player.name,
-        score: getTotalScore(index)
-      }))
+      playersWithStats: playersWithStats.sort((a, b) => a.score - b.score) // En az puandan başlayarak sırala
     };
     
     if (groupScores) {
@@ -178,33 +231,33 @@ export default function GamePage() {
       }
     } else {
       // Tekil modda: En az puandan en çok puana doğru sıralama
-      const playerRankings = players.map((player, index) => ({
-        name: player.name,
-        score: getTotalScore(index),
-        originalIndex: index
-      })).sort((a, b) => a.score - b.score); // En az puandan başlayarak sırala
-      
-      endData.rankings = playerRankings.map((player, index) => ({
+      endData.rankings = playersWithStats.map((player, index) => ({
         ...player,
         rank: index + 1
       }));
       
       // Kazanan en az puanlı oyuncu
-      endData.winner = playerRankings[0].name;
+      endData.winner = playersWithStats[0].name;
       endData.winnerType = 'single';
-      endData.winnerScore = playerRankings[0].score;
+      endData.winnerScore = playersWithStats[0].score;
     }
     
     setGameEndData(endData);
     setShowGameEndModal(true);
+    setShowCalculation(false); // Oyun bitince hesaplamayı kapat
   };
 
-  const startNewGame = () => {
+  const executeNewGame = () => {
     // Tüm localStorage verilerini temizle
     localStorage.removeItem('roundDetails');
     
     // Ana sayfaya git
     router.push('/');
+    setShowCalculation(false); // Yeni oyun başlarken hesaplamayı kapat
+  };
+
+  const startNewGame = () => {
+    openConfirmModal('newGame');
   };
 
   const getRoundDetail = (roundIndex: number) => {
@@ -285,14 +338,14 @@ export default function GamePage() {
           <h1 className="text-2xl md:text-3xl font-bold text-white mb-4 md:mb-6 text-center">101 Oyunu</h1>
           
           {/* Oyuncu Kartları - Mobil Optimize */}
-          <div className="grid grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6">
+          <div className="grid grid-cols-4 gap-1 sm:gap-2 md:gap-4 mb-4 md:mb-6">
             {players.map((player, index) => {
               const isGroup1 = index === 0 || index === 2;
               
               return (
                 <div 
                   key={index} 
-                  className={`text-center p-2 md:p-4 rounded-xl border-2 transition-all ${
+                  className={`text-center p-1.5 sm:p-2 md:p-4 rounded-lg md:rounded-xl border-2 transition-all min-h-[4rem] sm:min-h-[5rem] md:min-h-[6rem] ${
                     gameData.gameMode === 'group'
                       ? isGroup1 
                         ? 'bg-blue-900/20 border-blue-600 hover:bg-blue-900/30' 
@@ -300,34 +353,129 @@ export default function GamePage() {
                       : 'bg-gray-700 border-gray-600 hover:bg-gray-600'
                   }`}
                 >
-                  {/* Oyuncu İsmi */}
-                  <div className="text-sm md:text-lg font-semibold text-white truncate">
-                    {player.name}
+                  {/* Oyuncu İsmi - Mobil Optimize */}
+                  <div 
+                    className="font-semibold text-white group relative leading-tight"
+                    title={player.name} // Tooltip
+                  >
+                    {/* Mobil: Çok küçük font, Desktop: Normal font */}
+                    <div className={`${
+                      player.name.length > 8 
+                        ? 'text-[10px] sm:text-xs md:text-sm' 
+                        : player.name.length > 6 
+                        ? 'text-[11px] sm:text-xs md:text-base' 
+                        : player.name.length > 4
+                        ? 'text-xs sm:text-sm md:text-base'
+                        : 'text-xs sm:text-sm md:text-lg'
+                    }`}>
+                      {/* Mobilde word-break ile kelime bölme */}
+                      <div className="break-words hyphens-auto" style={{wordBreak: 'break-word', hyphens: 'auto'}}>
+                        {player.name}
+                      </div>
+                    </div>
+                    
+                    {/* Touch Tooltip - Mobil için */}
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-200 pointer-events-none z-10 whitespace-nowrap">
+                      {player.name}
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                    </div>
                   </div>
                   
-                  {/* Takım Bilgisi */}
+                  {/* Takım Bilgisi - Mobil Optimize */}
                   {gameData.gameMode === 'group' && (
-                    <div className={`text-xs md:text-sm mt-1 ${
-                      isGroup1 ? 'text-blue-300' : 'text-purple-300'
-                    }`}>
-                      {isGroup1 ? gameData.group1Name : gameData.group2Name}
+                    <div 
+                      className={`mt-0.5 sm:mt-1 font-medium leading-tight ${
+                        isGroup1 ? 'text-blue-300' : 'text-purple-300'
+                      }`}
+                      title={isGroup1 ? gameData.group1Name : gameData.group2Name}
+                    >
+                      <div className={`break-words ${
+                        ((isGroup1 ? gameData.group1Name : gameData.group2Name) || '').length > 8 
+                          ? 'text-[9px] sm:text-[10px] md:text-xs' 
+                          : 'text-[10px] sm:text-xs md:text-sm'
+                      }`} style={{wordBreak: 'break-word'}}>
+                        {isGroup1 ? gameData.group1Name : gameData.group2Name}
+                      </div>
                     </div>
                   )}
                   
                   {/* Puan - Sadece hesaplama gösterilirken */}
                   {showCalculation && (
-                    <div className="mt-2 md:mt-3">
-                      <div className={`text-lg md:text-2xl font-bold ${
+                    <div className="mt-1 sm:mt-2 md:mt-3">
+                      <div className={`text-sm sm:text-lg md:text-2xl font-bold ${
                         getTotalScore(index) > 0 ? 'text-red-400' : getTotalScore(index) < 0 ? 'text-green-400' : 'text-gray-300'
                       }`}>
                         {getTotalScore(index)}
                       </div>
-                      <div className="text-xs text-gray-400">puan</div>
-                    </div>
-                  )}
+                      <div className="text-[9px] sm:text-xs text-gray-400">puan</div>
+                            </div>
+      )}
+
+      {/* Onay Modalı */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-md">
+            <div className="p-6 text-center">
+              {/* İkon */}
+              <div className="text-6xl mb-4">
+                {confirmAction === 'finish' ? '🏁' : '🎮'}
+              </div>
+              
+              {/* Başlık */}
+              <h2 className="text-2xl font-bold text-white mb-4">
+                {confirmAction === 'finish' ? 'Oyunu Bitir' : 'Yeni Oyun Başlat'}
+              </h2>
+              
+              {/* Açıklama */}
+              <p className="text-gray-300 mb-6 leading-relaxed">
+                {confirmAction === 'finish' 
+                  ? 'Oyunu bitirmek istediğinizden emin misiniz? Oyun sonuç ekranına geçilecek ve kazanan belirlenecektir.'
+                  : 'Yeni oyun başlatmak istediğinizden emin misiniz? Mevcut oyun verileri silinecek ve ana sayfaya yönlendirileceksiniz.'
+                }
+              </p>
+              
+              {/* Uyarı */}
+              <div className="bg-yellow-900/30 border border-yellow-700 rounded-xl p-3 mb-6">
+                <div className="flex items-center justify-center space-x-2 text-yellow-300">
+                  <span>⚠️</span>
+                  <span className="text-sm font-medium">
+                    {confirmAction === 'finish' 
+                      ? 'Bu işlem geri alınamaz!'
+                      : 'Tüm round verileri kaybolacak!'
+                    }
+                  </span>
                 </div>
-              );
-            })}
+              </div>
+              
+              {/* Butonlar */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    setShowConfirmModal(false);
+                    setConfirmAction(null);
+                  }}
+                  className="bg-gray-600 hover:bg-gray-500 text-white py-3 px-4 rounded-xl font-semibold transition-colors"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleConfirmAction}
+                  className={`text-white py-3 px-4 rounded-xl font-semibold transition-colors ${
+                    confirmAction === 'finish'
+                      ? 'bg-red-600 hover:bg-red-500'
+                      : 'bg-green-600 hover:bg-green-500'
+                  }`}
+                >
+                  {confirmAction === 'finish' ? 'Evet, Bitir' : 'Evet, Başlat'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+})}
           </div>
 
           {/* Grup Skorları (Grup modunda ve hesaplama gösterilirken) */}
@@ -336,12 +484,48 @@ export default function GamePage() {
             return (
               <div className="grid grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
                 <div className="bg-gradient-to-br from-blue-900/50 to-blue-800/30 border-2 border-blue-600 rounded-xl p-3 md:p-6 text-center">
-                  <div className="text-sm md:text-lg font-semibold text-blue-300">{groupScores.group1.name}</div>
+                  <div 
+                    className={`font-semibold text-blue-300 group relative ${
+                      (groupScores.group1.name || '').length > 12 
+                        ? 'text-sm md:text-base' 
+                        : 'text-sm md:text-lg'
+                    }`}
+                    title={groupScores.group1.name}
+                  >
+                    <div className="truncate">
+                      {groupScores.group1.name}
+                    </div>
+                    {/* Hover Tooltip */}
+                    {(groupScores.group1.name || '').length > 12 && (
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 whitespace-nowrap">
+                        {groupScores.group1.name}
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    )}
+                  </div>
                   <div className="text-2xl md:text-4xl font-bold text-blue-400 mt-1 md:mt-2">{groupScores.group1.total}</div>
                   <div className="text-xs text-blue-300">toplam</div>
                 </div>
                 <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border-2 border-purple-600 rounded-xl p-3 md:p-6 text-center">
-                  <div className="text-sm md:text-lg font-semibold text-purple-300">{groupScores.group2.name}</div>
+                  <div 
+                    className={`font-semibold text-purple-300 group relative ${
+                      (groupScores.group2.name || '').length > 12 
+                        ? 'text-sm md:text-base' 
+                        : 'text-sm md:text-lg'
+                    }`}
+                    title={groupScores.group2.name}
+                  >
+                    <div className="truncate">
+                      {groupScores.group2.name}
+                    </div>
+                    {/* Hover Tooltip */}
+                    {(groupScores.group2.name || '').length > 12 && (
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 whitespace-nowrap">
+                        {groupScores.group2.name}
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    )}
+                  </div>
                   <div className="text-2xl md:text-4xl font-bold text-purple-400 mt-1 md:mt-2">{groupScores.group2.total}</div>
                   <div className="text-xs text-purple-300">toplam</div>
                 </div>
@@ -363,63 +547,52 @@ export default function GamePage() {
           ) : (
             <div className="bg-gray-700 border border-gray-600 rounded-xl overflow-hidden">
               {/* Header - Oyuncu İsimleri */}
-              <div className="bg-gray-600 p-3 border-b border-gray-500">
-                <div className="grid grid-cols-5 gap-2 md:gap-3">
-                  <div className="text-gray-300 font-semibold text-xs md:text-sm text-center">Round</div>
+              <div className="bg-gray-600 p-2 md:p-3 border-b border-gray-500">
+                <div className="grid grid-cols-6 gap-1 md:gap-3">
+                  <div className="text-gray-300 font-semibold text-[10px] sm:text-xs md:text-sm text-center">Round</div>
                   {players.map((player, playerIndex) => {
                     const isGroup1 = playerIndex === 0 || playerIndex === 2;
                     return (
                       <div key={playerIndex} className="text-center">
-                        <div className={`font-semibold text-xs md:text-sm truncate ${
-                          gameData.gameMode === 'group'
-                            ? isGroup1 ? 'text-blue-300' : 'text-purple-300'
-                            : 'text-gray-300'
-                        }`}>
-                          {player.name}
+                        <div 
+                          className={`font-semibold group relative leading-tight ${
+                            gameData.gameMode === 'group'
+                              ? isGroup1 ? 'text-blue-300' : 'text-purple-300'
+                              : 'text-gray-300'
+                          }`}
+                          title={player.name}
+                        >
+                          <div className={`break-words ${
+                            player.name.length > 8 
+                              ? 'text-[9px] sm:text-[10px] md:text-xs' 
+                              : player.name.length > 6 
+                              ? 'text-[10px] sm:text-xs md:text-sm' 
+                              : 'text-[10px] sm:text-xs md:text-sm'
+                          }`} style={{wordBreak: 'break-word', hyphens: 'auto'}}>
+                            {player.name}
+                          </div>
+                          
+                          {/* Touch Tooltip - Mobil için */}
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-200 pointer-events-none z-10 whitespace-nowrap">
+                            {player.name}
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                          </div>
                         </div>
                       </div>
                     );
                   })}
+                  <div className="text-gray-300 font-semibold text-[10px] sm:text-xs md:text-sm text-center">İşlemler</div>
                 </div>
               </div>
 
               {/* Rounds - Sadece Puanlar */}
               <div className="space-y-1">
                 {players[0].scores.map((_, roundIndex) => (
-                  <div key={roundIndex} className="p-2 md:p-3 hover:bg-gray-650 transition-colors">
-                    <div className="grid grid-cols-5 gap-2 md:gap-3 items-center">
-                      {/* Round Number + Detail Button */}
-                      <div className="flex items-center justify-center space-x-2">
-                        <span className="text-white font-medium text-sm">{roundIndex + 1}</span>
-                        <div className="flex space-x-1">
-                          <button
-                            onClick={() => {
-                              setSelectedRoundDetails(selectedRoundDetails === roundIndex ? null : roundIndex);
-                              setShowCalculation(false); // Detay açıldığında hesaplamayı kapat
-                              setIsEditMode(false); // Edit modu kapat
-                            }}
-                            className="bg-blue-600 hover:bg-blue-500 text-white p-1 rounded transition-colors"
-                            title="Detayları Gör"
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => {
-                              startEditRound(roundIndex);
-                              setSelectedRoundDetails(null);
-                              setShowCalculation(false);
-                            }}
-                            className="bg-orange-600 hover:bg-orange-500 text-white p-1 rounded transition-colors"
-                            title="Düzenle"
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                        </div>
+                  <div key={roundIndex} className="p-1.5 sm:p-2 md:p-3 hover:bg-gray-650 transition-colors">
+                    <div className="grid grid-cols-6 gap-1 sm:gap-2 md:gap-3 items-center">
+                      {/* Round Number */}
+                      <div className="text-center">
+                        <span className="text-white font-medium text-xs sm:text-sm">{roundIndex + 1}</span>
                       </div>
 
                       {/* Player Scores */}
@@ -435,6 +608,47 @@ export default function GamePage() {
                           </div>
                         );
                       })}
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center justify-center space-x-1 sm:space-x-2">
+                        <button
+                          onClick={() => {
+                            setSelectedRoundDetails(selectedRoundDetails === roundIndex ? null : roundIndex);
+                            setShowCalculation(false); // Detay açıldığında hesaplamayı kapat
+                            setIsEditMode(false); // Edit modu kapat
+                          }}
+                          className="bg-blue-600 hover:bg-blue-500 text-white p-1.5 sm:p-2 rounded-lg transition-colors group relative"
+                          title="Detayları Gör"
+                        >
+                          <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          {/* Tooltip */}
+                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                            Detayları Gör
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900"></div>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            startEditRound(roundIndex);
+                            setSelectedRoundDetails(null);
+                            setShowCalculation(false);
+                          }}
+                          className="bg-orange-600 hover:bg-orange-500 text-white p-1.5 sm:p-2 rounded-lg transition-colors group relative"
+                          title="Düzenle"
+                        >
+                          <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          {/* Tooltip */}
+                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                            Düzenle
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900"></div>
+                          </div>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -475,10 +689,7 @@ export default function GamePage() {
           </button>
 
           <button
-            onClick={() => {
-              finishGame();
-              setShowCalculation(false); // Oyun bitince hesaplamayı kapat
-            }}
+            onClick={finishGame}
             className="bg-red-600 hover:bg-red-500 text-white py-3 md:py-4 px-4 md:px-6 rounded-xl font-semibold text-base md:text-lg transition-all shadow-lg hover:shadow-xl hover:scale-105 flex items-center justify-center space-x-2"
           >
             <span className="text-xl">🏁</span>
@@ -486,10 +697,7 @@ export default function GamePage() {
           </button>
 
           <button
-            onClick={() => {
-              startNewGame();
-              setShowCalculation(false); // Yeni oyun başlarken hesaplamayı kapat
-            }}
+            onClick={startNewGame}
             className="bg-gray-600 hover:bg-gray-500 text-white py-3 md:py-4 px-4 md:px-6 rounded-xl font-semibold text-base md:text-lg transition-all shadow-lg hover:shadow-xl hover:scale-105 flex items-center justify-center space-x-2"
           >
             <span className="text-xl">🎮</span>
@@ -782,7 +990,7 @@ export default function GamePage() {
       {/* Oyun Bitiş Modalı */}
       {showGameEndModal && gameEndData && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-gray-800 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
             <div className="p-8 text-center">
               {/* Başlık */}
               <div className="mb-8">
@@ -820,7 +1028,8 @@ export default function GamePage() {
                 <h3 className="text-xl font-semibold text-white mb-4">Final Skorları</h3>
                 
                 {gameEndData.isGroup ? (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
+                    {/* Takım Skorları */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className={`p-4 rounded-xl border-2 ${
                         gameEndData.winnerType === 'group1' 
@@ -848,66 +1057,152 @@ export default function GamePage() {
                       </div>
                     </div>
                     
-                    {/* Oyuncu Detayları */}
-                    <div className="pt-4 border-t border-gray-600">
-                      <div className="text-sm text-gray-400 mb-3">Oyuncu Detayları</div>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        {gameEndData.playerScores.map((player: any, index: number) => (
-                          <div key={index} className="flex justify-between bg-gray-700 rounded-lg p-2">
-                            <span className="text-gray-300">{player.name}</span>
-                            <span className="text-white font-medium">{player.score}</span>
+                    {/* Oyuncu Sıralaması ve İstatistikleri */}
+                    <div className="space-y-4">
+                      <div className="text-lg font-semibold text-white mb-4 text-center">
+                        🏅 Oyuncu Sıralaması
+                      </div>
+                      
+                      {/* Başlık Satırı */}
+                      <div className="bg-gray-700 rounded-lg p-3">
+                        <div className="grid grid-cols-6 gap-4 text-xs font-semibold text-gray-300">
+                          <div className="col-span-2">Oyuncu</div>
+                          <div className="text-center">Puan</div>
+                          <div className="text-center">Okey</div>
+                          <div className="text-center">Bitirme</div>
+                          <div className="text-center">Ceza</div>
+                        </div>
+                      </div>
+                      
+                      {/* Oyuncu Listesi */}
+                      <div className="space-y-2">
+                        {gameEndData.playersWithStats.map((player: any, index: number) => (
+                          <div 
+                            key={index} 
+                            className={`p-3 rounded-lg border ${
+                              index === 0 ? 'border-green-500 bg-green-900/10' : 'border-gray-600 bg-gray-700/30'
+                            }`}
+                          >
+                            <div className="grid grid-cols-6 gap-4 items-center text-xs">
+                              {/* Oyuncu Bilgisi */}
+                              <div className="col-span-2 flex items-center space-x-2">
+                                <div className={`text-base font-bold min-w-[1.5rem] ${
+                                  index === 0 ? 'text-yellow-400' : 'text-gray-300'
+                                }`}>
+                                  {index === 0 ? '🏆' : `${index + 1}.`}
+                                </div>
+                                <div>
+                                  <div className={`font-medium text-sm ${
+                                    player.isGroup1 ? 'text-blue-300' : 
+                                    player.isGroup2 ? 'text-purple-300' : 'text-white'
+                                  }`}>
+                                    {player.name}
+                                  </div>
+                                  {gameData?.gameMode === 'group' && (
+                                    <div className="text-xs text-gray-400">
+                                      {player.isGroup1 ? gameEndData.groupScores.group1.name : 
+                                       player.isGroup2 ? gameEndData.groupScores.group2.name : ''}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* Puan */}
+                              <div className={`text-center font-bold text-sm ${
+                                player.score > 0 ? 'text-red-400' : player.score < 0 ? 'text-green-400' : 'text-gray-300'
+                              }`}>
+                                {player.score}
+                              </div>
+                              
+                              {/* Okey */}
+                              <div className="text-center">
+                                <span className="text-white font-medium text-sm">{player.stats.totalOkey}</span>
+                              </div>
+                              
+                              {/* Bitirme */}
+                              <div className="text-center">
+                                <span className="text-white font-medium text-sm">{player.stats.totalFinish}</span>
+                              </div>
+                              
+                              {/* Ceza */}
+                              <div className="text-center">
+                                <span className="text-white font-medium text-sm">{player.stats.totalPenalty}</span>
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {gameEndData.rankings ? (
-                      // Yeni sıralama sistemi - En az puandan en çok puana
-                      gameEndData.rankings.map((player: any, index: number) => (
-                        <div key={index} className={`flex justify-between items-center p-4 rounded-xl border-2 ${
-                          player.rank === 1
-                            ? 'border-green-500 bg-green-900/30' 
-                            : 'border-gray-600 bg-gray-700'
-                        }`}>
-                          <div className="flex items-center space-x-3">
-                            <div className="text-2xl min-w-[3rem] text-center">
-                              {player.rank === 1 ? '🏆' : `${player.rank}.`}
-                            </div>
-                            <div className="text-white font-medium">{player.name}</div>
-                          </div>
-                          <div className={`text-xl font-bold ${
-                            player.score > 0 ? 'text-red-400' : player.score < 0 ? 'text-green-400' : 'text-gray-300'
-                          }`}>
-                            {player.score}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      // Eski sistem (geriye dönük uyumluluk)
-                      gameEndData.playerScores
-                        .sort((a: any, b: any) => a.score - b.score) // En az puandan başla
-                        .map((player: any, index: number) => (
-                          <div key={index} className={`flex justify-between items-center p-4 rounded-xl border-2 ${
-                            index === 0
-                              ? 'border-green-500 bg-green-900/30' 
-                              : 'border-gray-600 bg-gray-700'
-                          }`}>
-                            <div className="flex items-center space-x-3">
-                              <div className="text-2xl min-w-[3rem] text-center">
+                  <div className="space-y-4">
+                    <div className="text-lg font-semibold text-white mb-4 text-center">
+                      🏅 Oyuncu Sıralaması
+                    </div>
+                    
+                    {/* Başlık Satırı */}
+                    <div className="bg-gray-700 rounded-lg p-3">
+                      <div className="grid grid-cols-6 gap-4 text-xs font-semibold text-gray-300">
+                        <div className="col-span-2">Oyuncu</div>
+                        <div className="text-center">Puan</div>
+                        <div className="text-center">Okey</div>
+                        <div className="text-center">Bitirme</div>
+                        <div className="text-center">Ceza</div>
+                      </div>
+                    </div>
+                    
+                    {/* Oyuncu Listesi */}
+                    <div className="space-y-2">
+                      {(gameEndData.rankings || gameEndData.playersWithStats)?.map((player: any, index: number) => (
+                        <div 
+                          key={index} 
+                          className={`p-3 rounded-lg border ${
+                            index === 0 ? 'border-green-500 bg-green-900/10' : 'border-gray-600 bg-gray-700/30'
+                          }`}
+                        >
+                          <div className="grid grid-cols-6 gap-4 items-center text-xs">
+                            {/* Oyuncu Bilgisi */}
+                            <div className="col-span-2 flex items-center space-x-2">
+                              <div className={`text-base font-bold min-w-[1.5rem] ${
+                                index === 0 ? 'text-yellow-400' : 'text-gray-300'
+                              }`}>
                                 {index === 0 ? '🏆' : `${index + 1}.`}
                               </div>
-                              <div className="text-white font-medium">{player.name}</div>
+                              <div>
+                                <div className="font-medium text-sm text-white">
+                                  {player.name}
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  Bireysel Oyuncu
+                                </div>
+                              </div>
                             </div>
-                            <div className={`text-xl font-bold ${
+                            
+                            {/* Puan */}
+                            <div className={`text-center font-bold text-sm ${
                               player.score > 0 ? 'text-red-400' : player.score < 0 ? 'text-green-400' : 'text-gray-300'
                             }`}>
                               {player.score}
                             </div>
+                            
+                            {/* Okey */}
+                            <div className="text-center">
+                              <span className="text-white font-medium text-sm">{player.stats?.totalOkey || 0}</span>
+                            </div>
+                            
+                            {/* Bitirme */}
+                            <div className="text-center">
+                              <span className="text-white font-medium text-sm">{player.stats?.totalFinish || 0}</span>
+                            </div>
+                            
+                            {/* Ceza */}
+                            <div className="text-center">
+                              <span className="text-white font-medium text-sm">{player.stats?.totalPenalty || 0}</span>
+                            </div>
                           </div>
-                        ))
-                    )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -915,7 +1210,10 @@ export default function GamePage() {
               {/* Butonlar */}
               <div className="grid grid-cols-1 gap-4">
                 <button
-                  onClick={startNewGame}
+                  onClick={() => {
+                    setShowGameEndModal(false);
+                    startNewGame();
+                  }}
                   className="bg-green-600 hover:bg-green-500 text-white py-4 px-6 rounded-xl font-semibold text-lg transition-colors shadow-lg hover:shadow-xl"
                 >
                   🎮 Yeni Oyun Başlat
@@ -924,8 +1222,7 @@ export default function GamePage() {
                 <button
                   onClick={() => {
                     setShowGameEndModal(false);
-                    // Oyun bittiğinde localStorage'ı temizle
-                    localStorage.removeItem('roundDetails');
+                    // Sadece modalı kapat, oyun verilerini sakla
                   }}
                   className="bg-gray-600 hover:bg-gray-500 text-white py-3 px-6 rounded-xl font-medium transition-colors"
                 >

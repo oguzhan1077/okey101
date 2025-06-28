@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
@@ -15,6 +15,69 @@ export default function Home() {
   const [player2, setPlayer2] = useState('');
   const [player3, setPlayer3] = useState('');
   const [player4, setPlayer4] = useState('');
+  const [hasOngoingGame, setHasOngoingGame] = useState(false);
+  const [ongoingGameData, setOngoingGameData] = useState<any>(null);
+
+  // localStorage'da devam eden oyun var mı kontrol et
+  useEffect(() => {
+    const checkOngoingGame = () => {
+      try {
+        const roundDetails = localStorage.getItem('roundDetails');
+        if (roundDetails) {
+          const gameData = JSON.parse(roundDetails);
+          if (gameData && gameData.length > 0) {
+            setHasOngoingGame(true);
+            // Son round'dan oyun bilgilerini al (en güncel)
+            const lastRound = gameData[gameData.length - 1];
+            console.log('Devam eden oyun bulundu:', lastRound);
+            setOngoingGameData(lastRound);
+          } else {
+            setHasOngoingGame(false);
+            setOngoingGameData(null);
+          }
+        } else {
+          setHasOngoingGame(false);
+          setOngoingGameData(null);
+        }
+      } catch (error) {
+        console.error('localStorage kontrol hatası:', error);
+        setHasOngoingGame(false);
+        setOngoingGameData(null);
+      }
+    };
+
+    checkOngoingGame();
+  }, []);
+
+  const handleReturnToGame = () => {
+    if (ongoingGameData) {
+      console.log('Oyuna dönülürken kullanılan veriler:', ongoingGameData);
+      
+      // Yeni veri formatı kullan, eski format için fallback
+      const mode = ongoingGameData.mode || 'single';
+      const player1 = ongoingGameData.player1 || (ongoingGameData.players && ongoingGameData.players[0]?.name) || '';
+      const player2 = ongoingGameData.player2 || (ongoingGameData.players && ongoingGameData.players[1]?.name) || '';
+      const player3 = ongoingGameData.player3 || (ongoingGameData.players && ongoingGameData.players[2]?.name) || '';
+      const player4 = ongoingGameData.player4 || (ongoingGameData.players && ongoingGameData.players[3]?.name) || '';
+      
+      // Oyun verilerinden URL parametrelerini oluştur
+      const params = new URLSearchParams({
+        mode,
+        player1,
+        player2,
+        player3,
+        player4
+      });
+
+      if (mode === 'group' && ongoingGameData.group1 && ongoingGameData.group2) {
+        params.append('group1', ongoingGameData.group1);
+        params.append('group2', ongoingGameData.group2);
+      }
+
+      console.log('Oluşturulan URL parametreleri:', params.toString());
+      router.push(`/game?${params.toString()}`);
+    }
+  };
 
   const canStartGame = () => {
     if (gameMode === 'group') {
@@ -277,6 +340,16 @@ export default function Home() {
         >
           🚀 Oyunu Başlat
         </button>
+
+        {/* Devam Eden Oyuna Dön Butonu */}
+        {hasOngoingGame && (
+          <button
+            onClick={handleReturnToGame}
+            className="w-full mt-4 py-4 px-6 rounded-xl font-semibold text-lg bg-orange-600 hover:bg-orange-500 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+          >
+            🎮 Oyuna Dön
+          </button>
+        )}
 
         {/* Oyun Kuralları İpucu */}
         <div className="mt-8 p-4 bg-blue-900/30 border border-blue-800 rounded-xl">
