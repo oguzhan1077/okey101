@@ -1,10 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Netlify için optimize edilmiş ayarlar
-  output: 'standalone', // Netlify için optimum
-  trailingSlash: true,
-  
   // Build optimizasyonları
   eslint: {
     ignoreDuringBuilds: true,
@@ -13,13 +9,12 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   
-  // Image optimizasyonu (Netlify'da sorun çıkarabilir)
+  // Image optimizasyonu Netlify için
   images: {
     unoptimized: true,
   },
   
-  // Experimental özellikler - Turbopack uyumlulukları
-  // experimental.esmExternals kaldırıldı (Turbopack uyumsuzluğu)
+  // Clean configuration - Netlify plugin handles routing
 };
 
 export default nextConfig;
