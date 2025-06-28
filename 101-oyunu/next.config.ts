@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Static export - Netlify'da garantili çalışır
+  output: 'export',
+  trailingSlash: true,
+  
   // Build optimizasyonları
   eslint: {
     ignoreDuringBuilds: true,
@@ -9,12 +13,13 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   
-  // Image optimizasyonu Netlify için
+  // Image optimizasyonu - static export için gerekli
   images: {
     unoptimized: true,
   },
   
-  // Clean configuration - Netlify plugin handles routing
+  // Static export için gerekli
+  distDir: 'out',
 };
 
 export default nextConfig;
