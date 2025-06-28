@@ -13,9 +13,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Force dynamic rendering - static generation'ı kapat
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
-  title: "101 Oyunu - Dijital Skor Takibi",
-  description: "101 oyunu için dijital skor takip uygulaması",
+  title: "101 Oyunu",
+  description: "Dijital skor takip uygulaması",
 };
 
 export default function RootLayout({
@@ -24,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="tr">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
