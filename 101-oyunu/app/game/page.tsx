@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
+// Next.js 15 için dynamic rendering'e zorla
+export const dynamic = 'force-dynamic';
+
 interface Player {
   name: string;
   scores: number[];
