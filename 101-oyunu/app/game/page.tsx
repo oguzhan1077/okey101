@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 // Next.js 15 için dynamic rendering'e zorla
@@ -31,7 +31,7 @@ interface GameData {
   players: string[];
 }
 
-export default function GamePage() {
+function GamePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [gameData, setGameData] = useState<GameData | null>(null);
@@ -1237,5 +1237,17 @@ export default function GamePage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function GamePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+        <div className="text-gray-300 text-xl">Yükleniyor...</div>
+      </div>
+    }>
+      <GamePageContent />
+    </Suspense>
   );
 } 

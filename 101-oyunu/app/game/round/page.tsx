@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 // Next.js 15 için dynamic rendering'e zorla
@@ -22,7 +22,7 @@ interface GameData {
   currentRound: number;
 }
 
-export default function RoundPage() {
+function RoundPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [gameData, setGameData] = useState<GameData | null>(null);
@@ -590,5 +590,17 @@ export default function RoundPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function RoundPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+        <div className="text-gray-300 text-xl">Yükleniyor...</div>
+      </div>
+    }>
+      <RoundPageContent />
+    </Suspense>
   );
 } 
