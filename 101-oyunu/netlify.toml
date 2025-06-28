@@ -1,20 +1,13 @@
 [build]
-  # Netlify Next.js plugin otomatik olarak halleder
   command = "npm run build"
-  publish = "out"
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "18"
 
-# Essential Next.js plugin - routing'i otomatik halleder
+# Essential Next.js plugin
 [[plugins]]
   package = "@netlify/plugin-nextjs"
-
-# Static site için basit redirects
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
 
 [context.production.environment]
   NEXT_PUBLIC_SUPABASE_URL = ""
