@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 // Next.js 15 için dynamic rendering'e zorla
@@ -58,27 +58,23 @@ function RoundPageContent() {
       }
 
       setGameData(data);
-      setPlayerScores(Array(4).fill(null).map(() => ({
-        points: 0,
-        penalty: 0,
-        individualPenalty: 0,
-        teamPenalty: 0,
-        hasOkey1: false,
-        hasOkey2: false,
-        finished: false,
-        handFinished: false
-      })));
+      setPlayerScores([
+        { points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0, hasOkey1: false, hasOkey2: false, finished: false, handFinished: false },
+        { points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0, hasOkey1: false, hasOkey2: false, finished: false, handFinished: false },
+        { points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0, hasOkey1: false, hasOkey2: false, finished: false, handFinished: false },
+        { points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0, hasOkey1: false, hasOkey2: false, finished: false, handFinished: false }
+      ]);
       setInputValues(['', '', '', '']); // Input alanlarını sıfırla
     }
   }, [searchParams]);
 
-  const updatePlayerScore = (playerIndex: number, field: keyof PlayerScore, value: any) => {
+  const updatePlayerScore = useCallback((playerIndex: number, field: keyof PlayerScore, value: any) => {
     setPlayerScores(prev => prev.map((score, index) => 
       index === playerIndex ? { ...score, [field]: value } : score
     ));
-  };
+  }, []);
 
-  const addPenalty = (playerIndex: number, type: 'individual' | 'team') => {
+  const addPenalty = useCallback((playerIndex: number, type: 'individual' | 'team') => {
     setPlayerScores(prev => prev.map((score, index) => {
       if (index === playerIndex) {
         const newScore = { ...score };
@@ -92,9 +88,9 @@ function RoundPageContent() {
       }
       return score;
     }));
-  };
+  }, []);
 
-  const removePenalty = (playerIndex: number, type: 'individual' | 'team') => {
+  const removePenalty = useCallback((playerIndex: number, type: 'individual' | 'team') => {
     setPlayerScores(prev => prev.map((score, index) => {
       if (index === playerIndex) {
         const newScore = { ...score };
@@ -108,9 +104,9 @@ function RoundPageContent() {
       }
       return score;
     }));
-  };
+  }, []);
 
-  const toggleOkey = (playerIndex: number, okeyNumber: 1 | 2) => {
+  const toggleOkey = useCallback((playerIndex: number, okeyNumber: 1 | 2) => {
     const okeyField = okeyNumber === 1 ? 'hasOkey1' : 'hasOkey2';
     
     setPlayerScores(prev => prev.map((score, index) => {
@@ -122,7 +118,7 @@ function RoundPageContent() {
         return { ...score, [okeyField]: false };
       }
     }));
-  };
+  }, []);
 
   const toggleFinished = (playerIndex: number) => {
     setPlayerScores(prev => {
@@ -251,7 +247,7 @@ function RoundPageContent() {
     });
   };
 
-  const getTeammateIndex = (playerIndex: number) => {
+  const getTeammateIndex = useCallback((playerIndex: number) => {
     if (!gameData || gameData.gameMode !== 'group') return -1;
     
     // Takım eşleşmeleri: 0-2 (1. takım), 1-3 (2. takım)
@@ -260,9 +256,9 @@ function RoundPageContent() {
     if (playerIndex === 2) return 0;
     if (playerIndex === 3) return 1;
     return -1;
-  };
+  }, [gameData?.gameMode]);
 
-  const isPointInputDisabled = (playerIndex: number) => {
+  const isPointInputDisabled = useCallback((playerIndex: number) => {
     if (!gameData || gameData.gameMode !== 'group') return false;
     
     // Takım arkadaşının bitirip bitirmediğini kontrol et
@@ -272,9 +268,9 @@ function RoundPageContent() {
     }
     
     return false;
-  };
+  }, [gameData?.gameMode, getTeammateIndex, playerScores]);
 
-  const getTotal = (playerIndex: number) => {
+  const getTotal = useCallback((playerIndex: number) => {
     const score = playerScores[playerIndex];
     if (!score) return 0;
     
@@ -291,9 +287,9 @@ function RoundPageContent() {
     }
     
     return total;
-  };
+  }, [playerScores]);
 
-  const handleSubmit = () => {
+  const handleSubmit = useCallback(() => {
     if (!gameData) return;
 
     // Tüm puanları hesapla
@@ -345,7 +341,7 @@ function RoundPageContent() {
     }
 
     router.push(`/game?${params.toString()}`);
-  };
+  }, [gameData, playerScores, getTotal, router]);
 
   if (!gameData) {
     return (
@@ -435,7 +431,7 @@ function RoundPageContent() {
                        <input
                          key={playerIndex}
                          type="text"
-                         inputMode="numeric"
+                         inputMode="decimal"
                          pattern="^-?\d*$"
                          value={isDisabled ? '0' : inputValues[playerIndex]}
                          disabled={isDisabled}
@@ -625,7 +621,7 @@ function RoundPageContent() {
                       return (
                         <input
                           type="text"
-                          inputMode="numeric"
+                          inputMode="decimal"
                           pattern="^-?\d*$"
                           value={isDisabled ? '0' : inputValues[playerIndex]}
                           disabled={isDisabled}
