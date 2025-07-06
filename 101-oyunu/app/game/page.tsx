@@ -17,9 +17,12 @@ interface RoundDetail {
     name: string;
     points: number;
     penalty: number;
+    individualPenalty: number;
+    teamPenalty: number;
     hasOkey1: boolean;
     hasOkey2: boolean;
     finished: boolean;
+    handFinished: boolean;
     total: number;
   }[];
 }
@@ -140,7 +143,41 @@ function GamePageContent() {
   };
 
   const getTotalScore = (playerIndex: number) => {
-    return players[playerIndex]?.scores.reduce((sum, score) => sum + score, 0) || 0;
+    let baseScore = players[playerIndex]?.scores.reduce((sum, score) => sum + score, 0) || 0;
+    
+    // Takım cezalarını eşit şekilde dağıt
+    if (gameData?.gameMode === 'group') {
+      const teammateIndex = getTeammateIndex(playerIndex);
+      
+      roundDetails.forEach(round => {
+        const player = round.players[playerIndex];
+        const teammate = teammateIndex !== -1 ? round.players[teammateIndex] : null;
+        
+        if (player && teammate) {
+          // Bu oyuncunun takım cezasının yarısını ekle
+          const playerTeamPenalty = player.teamPenalty / 2;
+          // Takım arkadaşının takım cezasının yarısını da ekle
+          const teammateTeamPenalty = teammate.teamPenalty / 2;
+          
+          baseScore += playerTeamPenalty + teammateTeamPenalty;
+          // Çift sayma olmasın diye orijinal takım cezasını çıkar
+          baseScore -= player.teamPenalty;
+        }
+      });
+    }
+    
+    return baseScore;
+  };
+
+  const getTeammateIndex = (playerIndex: number) => {
+    if (!gameData || gameData.gameMode !== 'group') return -1;
+    
+    // Takım eşleşmeleri: 0-2 (1. takım), 1-3 (2. takım)
+    if (playerIndex === 0) return 2;
+    if (playerIndex === 1) return 3;
+    if (playerIndex === 2) return 0;
+    if (playerIndex === 3) return 1;
+    return -1;
   };
 
   const getGroupScores = () => {
@@ -155,29 +192,95 @@ function GamePageContent() {
     };
   };
 
+  const getScoreDifferences = () => {
+    if (!gameData) return null;
+    
+    if (gameData.gameMode === 'group') {
+      const groupScores = getGroupScores();
+      if (!groupScores) return null;
+      
+      const difference = Math.abs(groupScores.group1.total - groupScores.group2.total);
+      const leader = groupScores.group1.total < groupScores.group2.total ? groupScores.group1 : groupScores.group2;
+      
+      return {
+        isGroup: true,
+        difference,
+        leader: leader.name,
+        scores: [groupScores.group1, groupScores.group2]
+      };
+    } else {
+      const playerScores = players.map((player, index) => ({
+        name: player.name,
+        score: getTotalScore(index),
+        index
+      })).sort((a, b) => a.score - b.score);
+      
+      const difference = playerScores.length > 1 ? Math.abs(playerScores[0].score - playerScores[1].score) : 0;
+      
+      return {
+        isGroup: false,
+        difference,
+        leader: playerScores[0].name,
+        scores: playerScores
+      };
+    }
+  };
+
   // Oyuncu istatistiklerini hesapla
   const getPlayerStats = (playerIndex: number) => {
     let totalOkey = 0;
     let totalFinish = 0;
-    let totalPenalty = 0;
+    let totalHandFinish = 0;
+    let totalIndividualPenalty = 0;
+    let totalTeamPenalty = 0;
 
     roundDetails.forEach(round => {
       const player = round.players[playerIndex];
       if (player.hasOkey1 || player.hasOkey2) {
         totalOkey++;
       }
-      if (player.finished) {
+      if (player.finished && !player.handFinished) {
         totalFinish++;
       }
-      if (player.penalty > 0) {
-        totalPenalty += player.penalty / 101; // Her 101 puan 1 ceza
+      if (player.handFinished) {
+        totalHandFinish++;
+      }
+      if (player.individualPenalty > 0) {
+        totalIndividualPenalty += player.individualPenalty / 101; // Her 101 puan 1 ceza
+      }
+      
+      // Takım cezası hesaplaması: Grup modunda takım arkadaşının cezaları da dahil
+      if (gameData?.gameMode === 'group') {
+        // Bu oyuncunun takım arkadaşının index'ini bul
+        const teammateIndex = getTeammateIndex(playerIndex);
+        
+        // Bu oyuncunun takım cezası
+        if (player.teamPenalty > 0) {
+          totalTeamPenalty += player.teamPenalty / 101;
+        }
+        
+        // Takım arkadaşının takım cezası da bu oyuncuya yansımalı
+        if (teammateIndex !== -1) {
+          const teammate = round.players[teammateIndex];
+          if (teammate.teamPenalty > 0) {
+            totalTeamPenalty += teammate.teamPenalty / 101;
+          }
+        }
+      } else {
+        // Tekil modda sadece kendi takım cezası (normalde takım cezası olmamalı ama güvenlik için)
+        if (player.teamPenalty > 0) {
+          totalTeamPenalty += player.teamPenalty / 101;
+        }
       }
     });
 
     return {
       totalOkey,
       totalFinish,
-      totalPenalty
+      totalHandFinish,
+      totalIndividualPenalty,
+      totalTeamPenalty,
+      totalPenalty: totalIndividualPenalty + totalTeamPenalty // Backward compatibility
     };
   };
 
@@ -535,6 +638,50 @@ function GamePageContent() {
               </div>
             );
           })()}
+
+          {/* Skor Farkları - Hesaplama gösterilirken */}
+          {showCalculation && (() => {
+            const differences = getScoreDifferences();
+            if (!differences) return null;
+            
+            return (
+              <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-4 md:p-6 mb-4 md:mb-6">
+                <h3 className="text-lg md:text-xl font-semibold text-white mb-4 text-center flex items-center justify-center space-x-2">
+                  <span>📊</span>
+                  <span>Skor Durumu</span>
+                </h3>
+                
+                <div className="space-y-4">
+                  {/* Lider */}
+                  <div className="bg-yellow-900/20 border border-yellow-700 rounded-xl p-3 md:p-4 text-center">
+                    <div className="text-yellow-300 text-sm md:text-base font-medium mb-1">
+                      🏆 Şu an önde
+                    </div>
+                    <div className="text-yellow-400 text-lg md:text-xl font-bold">
+                      {differences.leader}
+                    </div>
+                  </div>
+                  
+                  {/* Fark */}
+                  <div className="bg-blue-900/20 border border-blue-700 rounded-xl p-3 md:p-4 text-center">
+                    <div className="text-blue-300 text-sm md:text-base font-medium mb-1">
+                      📈 {differences.isGroup ? 'Takımlar' : 'Oyuncular'} Arası Fark
+                    </div>
+                    <div className="text-blue-400 text-xl md:text-2xl font-bold">
+                      {differences.difference} puan
+                    </div>
+                    {differences.difference === 0 && (
+                      <div className="text-gray-400 text-sm mt-1">
+                        🤝 Berabere durumda!
+                      </div>
+                    )}
+                  </div>
+                  
+
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Round Geçmişi */}
@@ -735,15 +882,16 @@ function GamePageContent() {
                   <div className="space-y-4">
                     {/* Compact Table Layout - Mobile Friendly */}
                     <div className="bg-gray-700 border border-gray-600 rounded-xl overflow-hidden">
-                      {/* Table Header */}
-                      <div className="bg-gray-600 grid grid-cols-6 gap-2 p-3 text-xs md:text-sm font-semibold">
-                        <div className="text-gray-300 text-center">Oyuncu</div>
-                        <div className="text-gray-300 text-center">Puan</div>
-                        <div className="text-gray-300 text-center">Ceza</div>
-                        <div className="text-gray-300 text-center">Okey</div>
-                        <div className="text-gray-300 text-center">Bitirdi</div>
-                        <div className="text-gray-300 text-center">Toplam</div>
-                      </div>
+                                              {/* Table Header */}
+                        <div className="bg-gray-600 grid grid-cols-7 gap-2 p-3 text-xs md:text-sm font-semibold">
+                          <div className="text-gray-300 text-center">Oyuncu</div>
+                          <div className="text-gray-300 text-center">Puan</div>
+                          <div className="text-gray-300 text-center">B.Ceza</div>
+                          <div className="text-gray-300 text-center">T.Ceza</div>
+                          <div className="text-gray-300 text-center">Okey</div>
+                          <div className="text-gray-300 text-center">Bitirdi</div>
+                          <div className="text-gray-300 text-center">Toplam</div>
+                        </div>
 
                       {/* Table Rows */}
                       {detail.players.map((player, index) => {
@@ -751,7 +899,7 @@ function GamePageContent() {
                         return (
                           <div 
                             key={index} 
-                            className={`grid grid-cols-6 gap-2 p-3 border-b border-gray-600 last:border-b-0 ${
+                            className={`grid grid-cols-7 gap-2 p-3 border-b border-gray-600 last:border-b-0 ${
                               gameData?.gameMode === 'group'
                                 ? isGroup1 
                                   ? 'bg-blue-900/10' 
@@ -779,17 +927,24 @@ function GamePageContent() {
                               </div>
                             </div>
 
-                            {/* Penalty */}
+                            {/* Individual Penalty */}
+                            <div className="text-center">
+                              <div className="font-bold text-sm text-orange-400">
+                                {player.individualPenalty || '-'}
+                              </div>
+                            </div>
+
+                            {/* Team Penalty */}
                             <div className="text-center">
                               <div className="font-bold text-sm text-red-400">
-                                {player.penalty}
+                                {(gameData?.gameMode === 'group' && player.teamPenalty) ? player.teamPenalty : '-'}
                               </div>
                             </div>
 
                             {/* Okey */}
                             <div className="text-center">
                               <div className="font-bold text-sm text-amber-400">
-                                {[player.hasOkey1 && '1', player.hasOkey2 && '2'].filter(Boolean).join(',') || '-'}
+                                {[player.hasOkey1 && '⚪', player.hasOkey2 && '⚪'].filter(Boolean).join(' ') || '-'}
                               </div>
                             </div>
 
@@ -1059,50 +1214,55 @@ function GamePageContent() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Takım Farkı */}
+                    {gameEndData.winnerType !== 'tie' && (
+                      <div className="bg-blue-900/20 border border-blue-700 rounded-xl p-4 text-center">
+                        <div className="text-blue-300 text-sm font-medium mb-1">
+                          📊 Takımlar Arası Fark
+                        </div>
+                        <div className="text-blue-400 text-xl font-bold">
+                          {Math.abs(gameEndData.groupScores.group1.total - gameEndData.groupScores.group2.total)} puan
+                        </div>
+                      </div>
+                    )}
                     
                     {/* Oyuncu Sıralaması ve İstatistikleri */}
                     <div className="space-y-4">
                       <div className="text-lg font-semibold text-white mb-4 text-center">
-                        🏅 Oyuncu Sıralaması
+                        🏅 Oyuncu Performansı
                       </div>
                       
-                      {/* Başlık Satırı */}
-                      <div className="bg-gray-700 rounded-lg p-3">
-                        <div className="grid grid-cols-6 gap-4 text-xs font-semibold text-gray-300">
-                          <div className="col-span-2">Oyuncu</div>
-                          <div className="text-center">Puan</div>
-                          <div className="text-center">Okey</div>
-                          <div className="text-center">Bitirme</div>
-                          <div className="text-center">Ceza</div>
-                        </div>
-                      </div>
-                      
-                      {/* Oyuncu Listesi */}
-                      <div className="space-y-2">
+                      {/* Oyuncu Card'ları */}
+                      <div className="space-y-3">
                         {gameEndData.playersWithStats.map((player: any, index: number) => (
                           <div 
                             key={index} 
-                            className={`p-3 rounded-lg border ${
-                              index === 0 ? 'border-green-500 bg-green-900/10' : 'border-gray-600 bg-gray-700/30'
+                            className={`rounded-xl border-2 p-4 transition-all ${
+                              index === 0 
+                                ? 'border-yellow-500 bg-gradient-to-r from-yellow-900/20 to-amber-900/20 shadow-lg' 
+                                : 'border-gray-600 bg-gray-700/50'
                             }`}
                           >
-                            <div className="grid grid-cols-6 gap-4 items-center text-xs">
-                              {/* Oyuncu Bilgisi */}
-                              <div className="col-span-2 flex items-center space-x-2">
-                                <div className={`text-base font-bold min-w-[1.5rem] ${
+                            {/* Oyuncu Header */}
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center space-x-3">
+                                <div className={`text-2xl font-bold ${
                                   index === 0 ? 'text-yellow-400' : 'text-gray-300'
                                 }`}>
                                   {index === 0 ? '🏆' : `${index + 1}.`}
                                 </div>
                                 <div>
-                                  <div className={`font-medium text-sm ${
+                                  <div className={`font-bold text-lg ${
                                     player.isGroup1 ? 'text-blue-300' : 
                                     player.isGroup2 ? 'text-purple-300' : 'text-white'
                                   }`}>
                                     {player.name}
                                   </div>
                                   {gameData?.gameMode === 'group' && (
-                                    <div className="text-xs text-gray-400">
+                                    <div className={`text-sm font-medium ${
+                                      player.isGroup1 ? 'text-blue-400' : 'text-purple-400'
+                                    }`}>
                                       {player.isGroup1 ? gameEndData.groupScores.group1.name : 
                                        player.isGroup2 ? gameEndData.groupScores.group2.name : ''}
                                     </div>
@@ -1110,26 +1270,110 @@ function GamePageContent() {
                                 </div>
                               </div>
                               
-                              {/* Puan */}
-                              <div className={`text-center font-bold text-sm ${
-                                player.score > 0 ? 'text-red-400' : player.score < 0 ? 'text-green-400' : 'text-gray-300'
-                              }`}>
-                                {player.score}
+                              {/* Final Puan */}
+                              <div className="text-right">
+                                <div className="text-xs text-gray-400 mb-1">Final Puan</div>
+                                <div className={`text-2xl font-bold ${
+                                  player.score > 0 ? 'text-red-400' : player.score < 0 ? 'text-green-400' : 'text-gray-300'
+                                }`}>
+                                  {player.score}
+                                </div>
                               </div>
-                              
-                              {/* Okey */}
-                              <div className="text-center">
-                                <span className="text-white font-medium text-sm">{player.stats.totalOkey}</span>
-                              </div>
-                              
-                              {/* Bitirme */}
-                              <div className="text-center">
-                                <span className="text-white font-medium text-sm">{player.stats.totalFinish}</span>
-                              </div>
-                              
-                              {/* Ceza */}
-                              <div className="text-center">
-                                <span className="text-white font-medium text-sm">{player.stats.totalPenalty}</span>
+                            </div>
+                            
+                                                         {/* İstatistik Badge'leri */}
+                             <div className="flex flex-wrap gap-2">
+                               {/* Okey Badge */}
+                               <div className={`border rounded-full px-3 py-1 flex items-center space-x-1 ${
+                                 player.stats.totalOkey > 0 
+                                   ? 'bg-amber-900/30 border-amber-600' 
+                                   : 'bg-gray-800/30 border-gray-600'
+                               }`}>
+                                 <span className={player.stats.totalOkey > 0 ? 'text-amber-400' : 'text-gray-500'}>⚪</span>
+                                 <span className={`text-sm font-medium ${
+                                   player.stats.totalOkey > 0 ? 'text-amber-300' : 'text-gray-400'
+                                 }`}>
+                                   {player.stats.totalOkey} Okey
+                                 </span>
+                               </div>
+                               
+                               {/* Normal Bitirme Badge */}
+                               <div className={`border rounded-full px-3 py-1 flex items-center space-x-1 ${
+                                 player.stats.totalFinish > 0 
+                                   ? 'bg-green-900/30 border-green-600' 
+                                   : 'bg-gray-800/30 border-gray-600'
+                               }`}>
+                                 <span className={player.stats.totalFinish > 0 ? 'text-green-400' : 'text-gray-500'}>✅</span>
+                                 <span className={`text-sm font-medium ${
+                                   player.stats.totalFinish > 0 ? 'text-green-300' : 'text-gray-400'
+                                 }`}>
+                                   {player.stats.totalFinish} Bitirme
+                                 </span>
+                               </div>
+                               
+                               {/* Elden Bitirme Badge */}
+                               <div className={`border rounded-full px-3 py-1 flex items-center space-x-1 ${
+                                 player.stats.totalHandFinish > 0 
+                                   ? 'bg-purple-900/30 border-purple-600' 
+                                   : 'bg-gray-800/30 border-gray-600'
+                               }`}>
+                                 <span className={player.stats.totalHandFinish > 0 ? 'text-purple-400' : 'text-gray-500'}>🎯</span>
+                                 <span className={`text-sm font-medium ${
+                                   player.stats.totalHandFinish > 0 ? 'text-purple-300' : 'text-gray-400'
+                                 }`}>
+                                   {player.stats.totalHandFinish} Elden
+                                 </span>
+                               </div>
+                               
+                               {/* Bireysel Ceza Badge */}
+                               <div className={`border rounded-full px-3 py-1 flex items-center space-x-1 ${
+                                 player.stats.totalIndividualPenalty > 0 
+                                   ? 'bg-orange-900/30 border-orange-600' 
+                                   : 'bg-gray-800/30 border-gray-600'
+                               }`}>
+                                 <span className={player.stats.totalIndividualPenalty > 0 ? 'text-orange-400' : 'text-gray-500'}>⚠️</span>
+                                 <span className={`text-sm font-medium ${
+                                   player.stats.totalIndividualPenalty > 0 ? 'text-orange-300' : 'text-gray-400'
+                                 }`}>
+                                   {player.stats.totalIndividualPenalty} Bireysel Ceza
+                                 </span>
+                               </div>
+                               
+                               {/* Takım Cezası Badge - Sadece grup modunda */}
+                               {gameData?.gameMode === 'group' && (
+                                 <div className={`border rounded-full px-3 py-1 flex items-center space-x-1 ${
+                                   player.stats.totalTeamPenalty > 0 
+                                     ? 'bg-red-900/30 border-red-600' 
+                                     : 'bg-gray-800/30 border-gray-600'
+                                 }`}>
+                                   <span className={player.stats.totalTeamPenalty > 0 ? 'text-red-400' : 'text-gray-500'}>🚨</span>
+                                   <span className={`text-sm font-medium ${
+                                     player.stats.totalTeamPenalty > 0 ? 'text-red-300' : 'text-gray-400'
+                                   }`}>
+                                     {player.stats.totalTeamPenalty} Takım Cezası
+                                   </span>
+                                 </div>
+                               )}
+                               
+                               {/* Temiz Oyun Badge - Hiç ceza almamışsa */}
+                               {player.stats.totalIndividualPenalty === 0 && player.stats.totalTeamPenalty === 0 && (
+                                 <div className="bg-blue-900/30 border border-blue-600 rounded-full px-3 py-1 flex items-center space-x-1">
+                                   <span className="text-blue-400">✨</span>
+                                   <span className="text-blue-300 text-sm font-medium">Temiz Oyun</span>
+                                 </div>
+                               )}
+                             </div>
+                            
+                            {/* Performans Özeti */}
+                            <div className="mt-3 pt-3 border-t border-gray-600">
+                              <div className="text-xs text-gray-400 text-center">
+                                Toplam {roundDetails.length} round oynadı
+                                {player.stats.totalOkey + player.stats.totalFinish + player.stats.totalHandFinish > 0 && (
+                                  <span className="text-green-400"> • {player.stats.totalOkey + player.stats.totalFinish + player.stats.totalHandFinish} başarı</span>
+                                )}
+                                {player.stats.totalIndividualPenalty + player.stats.totalTeamPenalty > 0 && (
+                                  <span className="text-red-400"> • {player.stats.totalIndividualPenalty + player.stats.totalTeamPenalty} ceza</span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1140,67 +1384,138 @@ function GamePageContent() {
                 ) : (
                   <div className="space-y-4">
                     <div className="text-lg font-semibold text-white mb-4 text-center">
-                      🏅 Oyuncu Sıralaması
+                      🏅 Oyuncu Performansı
                     </div>
-                    
-                    {/* Başlık Satırı */}
-                    <div className="bg-gray-700 rounded-lg p-3">
-                      <div className="grid grid-cols-6 gap-4 text-xs font-semibold text-gray-300">
-                        <div className="col-span-2">Oyuncu</div>
-                        <div className="text-center">Puan</div>
-                        <div className="text-center">Okey</div>
-                        <div className="text-center">Bitirme</div>
-                        <div className="text-center">Ceza</div>
+
+                    {/* Oyuncu Farkı */}
+                    {gameEndData.rankings && gameEndData.rankings.length > 1 && (
+                      <div className="bg-blue-900/20 border border-blue-700 rounded-xl p-4 text-center">
+                        <div className="text-blue-300 text-sm font-medium mb-1">
+                          📊 1. ve 2. Oyuncu Arası Fark
+                        </div>
+                        <div className="text-blue-400 text-xl font-bold">
+                          {Math.abs(gameEndData.rankings[0].score - gameEndData.rankings[1].score)} puan
+                        </div>
                       </div>
-                    </div>
+                    )}
                     
-                    {/* Oyuncu Listesi */}
-                    <div className="space-y-2">
+                    {/* Oyuncu Card'ları */}
+                    <div className="space-y-3">
                       {(gameEndData.rankings || gameEndData.playersWithStats)?.map((player: any, index: number) => (
                         <div 
                           key={index} 
-                          className={`p-3 rounded-lg border ${
-                            index === 0 ? 'border-green-500 bg-green-900/10' : 'border-gray-600 bg-gray-700/30'
+                          className={`rounded-xl border-2 p-4 transition-all ${
+                            index === 0 
+                              ? 'border-yellow-500 bg-gradient-to-r from-yellow-900/20 to-amber-900/20 shadow-lg' 
+                              : 'border-gray-600 bg-gray-700/50'
                           }`}
                         >
-                          <div className="grid grid-cols-6 gap-4 items-center text-xs">
-                            {/* Oyuncu Bilgisi */}
-                            <div className="col-span-2 flex items-center space-x-2">
-                              <div className={`text-base font-bold min-w-[1.5rem] ${
+                          {/* Oyuncu Header */}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <div className={`text-2xl font-bold ${
                                 index === 0 ? 'text-yellow-400' : 'text-gray-300'
                               }`}>
                                 {index === 0 ? '🏆' : `${index + 1}.`}
                               </div>
                               <div>
-                                <div className="font-medium text-sm text-white">
+                                <div className="font-bold text-lg text-white">
                                   {player.name}
                                 </div>
-                                <div className="text-xs text-gray-400">
+                                <div className="text-sm font-medium text-gray-400">
                                   Bireysel Oyuncu
                                 </div>
                               </div>
                             </div>
                             
-                            {/* Puan */}
-                            <div className={`text-center font-bold text-sm ${
-                              player.score > 0 ? 'text-red-400' : player.score < 0 ? 'text-green-400' : 'text-gray-300'
-                            }`}>
-                              {player.score}
+                            {/* Final Puan */}
+                            <div className="text-right">
+                              <div className="text-xs text-gray-400 mb-1">Final Puan</div>
+                              <div className={`text-2xl font-bold ${
+                                player.score > 0 ? 'text-red-400' : player.score < 0 ? 'text-green-400' : 'text-gray-300'
+                              }`}>
+                                {player.score}
+                              </div>
                             </div>
-                            
-                            {/* Okey */}
-                            <div className="text-center">
-                              <span className="text-white font-medium text-sm">{player.stats?.totalOkey || 0}</span>
-                            </div>
-                            
-                            {/* Bitirme */}
-                            <div className="text-center">
-                              <span className="text-white font-medium text-sm">{player.stats?.totalFinish || 0}</span>
-                            </div>
-                            
-                            {/* Ceza */}
-                            <div className="text-center">
-                              <span className="text-white font-medium text-sm">{player.stats?.totalPenalty || 0}</span>
+                          </div>
+                          
+                                                     {/* İstatistik Badge'leri */}
+                           <div className="flex flex-wrap gap-2">
+                             {/* Okey Badge */}
+                             <div className={`border rounded-full px-3 py-1 flex items-center space-x-1 ${
+                               (player.stats?.totalOkey || 0) > 0 
+                                 ? 'bg-amber-900/30 border-amber-600' 
+                                 : 'bg-gray-800/30 border-gray-600'
+                             }`}>
+                               <span className={(player.stats?.totalOkey || 0) > 0 ? 'text-amber-400' : 'text-gray-500'}>⚪</span>
+                               <span className={`text-sm font-medium ${
+                                 (player.stats?.totalOkey || 0) > 0 ? 'text-amber-300' : 'text-gray-400'
+                               }`}>
+                                 {player.stats?.totalOkey || 0} Okey
+                               </span>
+                             </div>
+                             
+                             {/* Normal Bitirme Badge */}
+                             <div className={`border rounded-full px-3 py-1 flex items-center space-x-1 ${
+                               (player.stats?.totalFinish || 0) > 0 
+                                 ? 'bg-green-900/30 border-green-600' 
+                                 : 'bg-gray-800/30 border-gray-600'
+                             }`}>
+                               <span className={(player.stats?.totalFinish || 0) > 0 ? 'text-green-400' : 'text-gray-500'}>✅</span>
+                               <span className={`text-sm font-medium ${
+                                 (player.stats?.totalFinish || 0) > 0 ? 'text-green-300' : 'text-gray-400'
+                               }`}>
+                                 {player.stats?.totalFinish || 0} Bitirme
+                               </span>
+                             </div>
+                             
+                             {/* Elden Bitirme Badge */}
+                             <div className={`border rounded-full px-3 py-1 flex items-center space-x-1 ${
+                               (player.stats?.totalHandFinish || 0) > 0 
+                                 ? 'bg-purple-900/30 border-purple-600' 
+                                 : 'bg-gray-800/30 border-gray-600'
+                             }`}>
+                               <span className={(player.stats?.totalHandFinish || 0) > 0 ? 'text-purple-400' : 'text-gray-500'}>🎯</span>
+                               <span className={`text-sm font-medium ${
+                                 (player.stats?.totalHandFinish || 0) > 0 ? 'text-purple-300' : 'text-gray-400'
+                               }`}>
+                                 {player.stats?.totalHandFinish || 0} Elden
+                               </span>
+                             </div>
+                             
+                             {/* Bireysel Ceza Badge */}
+                             <div className={`border rounded-full px-3 py-1 flex items-center space-x-1 ${
+                               (player.stats?.totalIndividualPenalty || 0) > 0 
+                                 ? 'bg-orange-900/30 border-orange-600' 
+                                 : 'bg-gray-800/30 border-gray-600'
+                             }`}>
+                               <span className={(player.stats?.totalIndividualPenalty || 0) > 0 ? 'text-orange-400' : 'text-gray-500'}>⚠️</span>
+                               <span className={`text-sm font-medium ${
+                                 (player.stats?.totalIndividualPenalty || 0) > 0 ? 'text-orange-300' : 'text-gray-400'
+                               }`}>
+                                 {player.stats?.totalIndividualPenalty || 0} Bireysel Ceza
+                               </span>
+                             </div>
+                             
+                             {/* Temiz Oyun Badge - Hiç ceza almamışsa */}
+                             {(player.stats?.totalIndividualPenalty || 0) === 0 && (
+                               <div className="bg-blue-900/30 border border-blue-600 rounded-full px-3 py-1 flex items-center space-x-1">
+                                 <span className="text-blue-400">✨</span>
+                                 <span className="text-blue-300 text-sm font-medium">Temiz Oyun</span>
+                               </div>
+                             )}
+                           </div>
+                          
+                          {/* Performans Özeti */}
+                          <div className="mt-3 pt-3 border-t border-gray-600">
+                            <div className="text-xs text-gray-400 text-center">
+                              Toplam {roundDetails.length} round oynadı
+                              {((player.stats?.totalOkey || 0) + (player.stats?.totalFinish || 0) + (player.stats?.totalHandFinish || 0)) > 0 && (
+                                <span className="text-green-400"> • {(player.stats?.totalOkey || 0) + (player.stats?.totalFinish || 0) + (player.stats?.totalHandFinish || 0)} başarı</span>
+                              )}
+                              {(player.stats?.totalIndividualPenalty || 0) > 0 && (
+                                <span className="text-red-400"> • {player.stats?.totalIndividualPenalty || 0} ceza</span>
+                              )}
                             </div>
                           </div>
                         </div>

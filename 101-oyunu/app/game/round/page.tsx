@@ -8,10 +8,13 @@ export const dynamic = 'force-dynamic';
 
 interface PlayerScore {
   points: number;
-  penalty: number;
+  penalty: number; // Backward compatibility - toplam ceza
+  individualPenalty: number; // Bireysel ceza
+  teamPenalty: number; // Takım cezası
   hasOkey1: boolean;
   hasOkey2: boolean;
   finished: boolean; // Oyuncu bitirdiyse -101 puan
+  handFinished: boolean; // Elden bitirdiyse -202 puan
 }
 
 interface GameData {
@@ -58,9 +61,12 @@ function RoundPageContent() {
       setPlayerScores(Array(4).fill(null).map(() => ({
         points: 0,
         penalty: 0,
+        individualPenalty: 0,
+        teamPenalty: 0,
         hasOkey1: false,
         hasOkey2: false,
-        finished: false
+        finished: false,
+        handFinished: false
       })));
       setInputValues(['', '', '', '']); // Input alanlarını sıfırla
     }
@@ -72,16 +78,36 @@ function RoundPageContent() {
     ));
   };
 
-  const addPenalty = (playerIndex: number) => {
-    setPlayerScores(prev => prev.map((score, index) => 
-      index === playerIndex ? { ...score, penalty: score.penalty + 101 } : score
-    ));
+  const addPenalty = (playerIndex: number, type: 'individual' | 'team') => {
+    setPlayerScores(prev => prev.map((score, index) => {
+      if (index === playerIndex) {
+        const newScore = { ...score };
+        if (type === 'individual') {
+          newScore.individualPenalty = score.individualPenalty + 101;
+        } else {
+          newScore.teamPenalty = score.teamPenalty + 101;
+        }
+        newScore.penalty = newScore.individualPenalty + newScore.teamPenalty;
+        return newScore;
+      }
+      return score;
+    }));
   };
 
-  const removePenalty = (playerIndex: number) => {
-    setPlayerScores(prev => prev.map((score, index) => 
-      index === playerIndex ? { ...score, penalty: Math.max(0, score.penalty - 101) } : score
-    ));
+  const removePenalty = (playerIndex: number, type: 'individual' | 'team') => {
+    setPlayerScores(prev => prev.map((score, index) => {
+      if (index === playerIndex) {
+        const newScore = { ...score };
+        if (type === 'individual') {
+          newScore.individualPenalty = Math.max(0, score.individualPenalty - 101);
+        } else {
+          newScore.teamPenalty = Math.max(0, score.teamPenalty - 101);
+        }
+        newScore.penalty = newScore.individualPenalty + newScore.teamPenalty;
+        return newScore;
+      }
+      return score;
+    }));
   };
 
   const toggleOkey = (playerIndex: number, okeyNumber: 1 | 2) => {
@@ -117,15 +143,15 @@ function RoundPageContent() {
               newInputValues[teammateIndex] = '';
               setInputValues(newInputValues);
               
-              return { ...score, finished: newFinished };
+              return { ...score, finished: newFinished, handFinished: false };
             }
           }
           
-          return { ...score, finished: newFinished };
+          return { ...score, finished: newFinished, handFinished: false };
         }
         // Eğer başka bir oyuncu seçiliyorsa, diğerlerinin finished durumunu false yap (sadece 1 kişi bitebilir)
         else if (prev[playerIndex].finished !== true) {
-          return { ...score, finished: false };
+          return { ...score, finished: false, handFinished: false };
         }
         return score;
       });
@@ -141,6 +167,84 @@ function RoundPageContent() {
           newInputValues[teammateIndex] = '';
           setInputValues(newInputValues);
         }
+      }
+      
+      return newScores;
+    });
+  };
+
+  const toggleHandFinished = (playerIndex: number) => {
+    if (!gameData) return;
+    
+    setPlayerScores(prev => {
+      const newHandFinished = !prev[playerIndex].handFinished;
+      
+      const newScores = prev.map((score, index) => {
+        // Tüm oyuncuların hand finished durumunu false yap
+        const resetScore = { ...score, handFinished: false, finished: false };
+        
+        if (newHandFinished) {
+          if (gameData.gameMode === 'group') {
+            // GRUP MODU: Mevcut mantık
+            const teammateIndex = getTeammateIndex(playerIndex);
+            
+            if (index === playerIndex) {
+              // Elden biten oyuncuya -202 puan
+              return { ...resetScore, points: -202, handFinished: true, finished: true };
+            } else if (index === teammateIndex) {
+              // Eşine 0 puan
+              return { ...resetScore, points: 0 };
+            } else {
+              // Karşı takımın her oyuncusuna 202 puan + 202 bireysel ceza
+              return { ...resetScore, points: 202, individualPenalty: 202, penalty: 202 };
+            }
+          } else {
+            // BİREYSEL MODU: Yeni mantık
+            if (index === playerIndex) {
+              // Elden biten oyuncuya -202 puan
+              return { ...resetScore, points: -202, handFinished: true, finished: true };
+            } else {
+              // Diğer tüm oyunculara 202 puan + 202 bireysel ceza
+              return { ...resetScore, points: 202, individualPenalty: 202, penalty: 202 };
+            }
+          }
+        }
+        
+        return resetScore;
+      });
+      
+      // Input değerlerini güncelle
+      if (newHandFinished) {
+        const newInputValues = ['', '', '', ''];
+        
+        if (gameData.gameMode === 'group') {
+          // GRUP MODU
+          const teammateIndex = getTeammateIndex(playerIndex);
+          
+          newInputValues[playerIndex] = '-202';
+          if (teammateIndex !== -1) {
+            newInputValues[teammateIndex] = '0';
+          }
+          
+          // Karşı takım oyuncularının input değerleri
+          [0, 1, 2, 3].forEach(i => {
+            if (i !== playerIndex && i !== teammateIndex) {
+              newInputValues[i] = '202';
+            }
+          });
+        } else {
+          // BİREYSEL MODU
+          newInputValues[playerIndex] = '-202';
+          [0, 1, 2, 3].forEach(i => {
+            if (i !== playerIndex) {
+              newInputValues[i] = '202';
+            }
+          });
+        }
+        
+        setInputValues(newInputValues);
+      } else {
+        setInputValues(['', '', '', '']);
       }
       
       return newScores;
@@ -176,8 +280,13 @@ function RoundPageContent() {
     
     let total = score.points + score.penalty;
     
-    // Oyuncu bitirdiyse -101 puan
-    if (score.finished) {
+    // Elden bitirdiyse zaten -202 puan olarak hesaplandı
+    if (score.handFinished) {
+      return total;
+    }
+    
+    // Normal bitirmede -101 puan
+    if (score.finished && !score.handFinished) {
       total -= 101;
     }
     
@@ -204,9 +313,12 @@ function RoundPageContent() {
         name,
         points: playerScores[index].points,
         penalty: playerScores[index].penalty,
+        individualPenalty: playerScores[index].individualPenalty,
+        teamPenalty: playerScores[index].teamPenalty,
         hasOkey1: playerScores[index].hasOkey1,
         hasOkey2: playerScores[index].hasOkey2,
         finished: playerScores[index].finished,
+        handFinished: playerScores[index].handFinished,
         total: getTotal(index)
       }))
     };
@@ -277,7 +389,15 @@ function RoundPageContent() {
             <div className="grid grid-cols-5 gap-4 text-center">
               <div className="text-gray-200 font-semibold text-sm">Oyuncu</div>
               <div className="text-gray-200 font-semibold text-sm">Puan</div>
-              <div className="text-gray-200 font-semibold text-sm">Ceza</div>
+              <div className="text-gray-200 font-semibold text-sm">
+                <div>Ceza</div>
+                <div className="text-xs font-normal text-gray-400 mt-1">
+                  <span className="text-orange-300">Bireysel</span>
+                  {gameData.gameMode === 'group' && (
+                    <span className="text-red-300 ml-2">Takım</span>
+                  )}
+                </div>
+              </div>
               <div className="text-gray-200 font-semibold text-sm">Okey</div>
               <div className="text-gray-200 font-semibold text-sm">Toplam</div>
             </div>
@@ -354,30 +474,70 @@ function RoundPageContent() {
               {/* Penalty Row */}
               <div>
                 <div className="text-sm font-medium text-gray-300 mb-2">Ceza</div>
-                <div className="grid grid-cols-4 gap-2">
-                  {gameData.players.map((_, playerIndex) => (
-                    <div key={playerIndex} className="flex items-center justify-center space-x-1">
-                      <button
-                        onClick={() => removePenalty(playerIndex)}
-                        disabled={playerScores[playerIndex]?.penalty === 0}
-                        className="w-8 h-8 rounded-full bg-red-700 text-red-200 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-sm font-bold"
-                      >
-                        −
-                      </button>
-                      <div className="bg-gray-700 border border-gray-600 rounded px-2 py-1 min-w-[40px] text-center">
-                        <span className="text-white font-medium text-sm">
-                          {playerScores[playerIndex]?.penalty || 0}
-                        </span>
+                
+                {/* Bireysel Ceza */}
+                <div className="mb-3">
+                  <div className="text-xs text-orange-300 text-center mb-1">Bireysel</div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {gameData.players.map((_, playerIndex) => (
+                      <div key={playerIndex} className="flex items-center justify-center space-x-1">
+                        <button
+                          onClick={() => removePenalty(playerIndex, 'individual')}
+                          disabled={playerScores[playerIndex]?.individualPenalty === 0}
+                          className="w-6 h-6 rounded-full bg-orange-700 text-orange-200 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-xs font-bold touch-manipulation"
+                          title="Bireysel ceza çıkar"
+                        >
+                          −
+                        </button>
+                        <div className="bg-gray-700 border border-gray-600 rounded px-1 py-0.5 min-w-[30px] text-center">
+                          <span className="text-white font-medium text-xs">
+                            {playerScores[playerIndex]?.individualPenalty || 0}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => addPenalty(playerIndex, 'individual')}
+                          className="w-6 h-6 rounded-full bg-orange-700 text-orange-200 hover:bg-orange-600 transition-colors flex items-center justify-center text-xs font-bold touch-manipulation"
+                          title="Bireysel ceza ekle"
+                        >
+                          +
+                        </button>
                       </div>
-                      <button
-                        onClick={() => addPenalty(playerIndex)}
-                        className="w-8 h-8 rounded-full bg-red-700 text-red-200 hover:bg-red-600 transition-colors flex items-center justify-center text-sm font-bold"
-                      >
-                        +
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
+                
+                {/* Takım Cezası - Sadece grup modunda */}
+                {gameData.gameMode === 'group' && (
+                  <div>
+                    <div className="text-xs text-red-300 text-center mb-1">Takım</div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {gameData.players.map((_, playerIndex) => (
+                        <div key={playerIndex} className="flex items-center justify-center space-x-1">
+                          <button
+                            onClick={() => removePenalty(playerIndex, 'team')}
+                            disabled={playerScores[playerIndex]?.teamPenalty === 0}
+                            className="w-6 h-6 rounded-full bg-red-700 text-red-200 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-xs font-bold touch-manipulation"
+                            title="Takım cezası çıkar"
+                          >
+                            −
+                          </button>
+                          <div className="bg-gray-700 border border-gray-600 rounded px-1 py-0.5 min-w-[30px] text-center">
+                            <span className="text-white font-medium text-xs">
+                              {playerScores[playerIndex]?.teamPenalty || 0}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => addPenalty(playerIndex, 'team')}
+                            className="w-6 h-6 rounded-full bg-red-700 text-red-200 hover:bg-red-600 transition-colors flex items-center justify-center text-xs font-bold touch-manipulation"
+                            title="Takım cezası ekle"
+                          >
+                            +
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Okey Row */}
@@ -388,23 +548,25 @@ function RoundPageContent() {
                     <div key={playerIndex} className="flex justify-center space-x-1">
                       <button
                         onClick={() => toggleOkey(playerIndex, 1)}
-                        className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors ${
+                        className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors touch-manipulation ${
                           playerScores[playerIndex]?.hasOkey1
                             ? 'bg-amber-600 text-white shadow-lg'
                             : 'bg-amber-900/30 border border-amber-700 text-amber-300 hover:bg-amber-800/50'
                         }`}
+                        title="İlk Okey"
                       >
-                        1
+                        ⚪
                       </button>
                       <button
                         onClick={() => toggleOkey(playerIndex, 2)}
-                        className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors ${
+                        className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors touch-manipulation ${
                           playerScores[playerIndex]?.hasOkey2
                             ? 'bg-amber-600 text-white shadow-lg'
                             : 'bg-amber-900/30 border border-amber-700 text-amber-300 hover:bg-amber-800/50'
                         }`}
+                        title="İkinci Okey"
                       >
-                        2
+                        ⚪
                       </button>
                     </div>
                   ))}
@@ -483,46 +645,79 @@ function RoundPageContent() {
                   </div>
 
                   {/* Penalty */}
-                  <div className="flex items-center justify-center space-x-3">
-                    <button
-                      onClick={() => removePenalty(playerIndex)}
-                      disabled={playerScores[playerIndex]?.penalty === 0}
-                      className="w-9 h-9 rounded-full bg-red-700 text-red-200 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-sm font-bold"
-                    >
-                      −
-                    </button>
-                    <span className="text-white font-medium min-w-[50px] text-center bg-gray-700 border border-gray-600 rounded-lg px-2 py-1">
-                      {playerScores[playerIndex]?.penalty || 0}
-                    </span>
-                    <button
-                      onClick={() => addPenalty(playerIndex)}
-                      className="w-9 h-9 rounded-full bg-red-700 text-red-200 hover:bg-red-600 transition-colors flex items-center justify-center text-sm font-bold"
-                    >
-                      +
-                    </button>
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="space-y-2">
+                      {/* Bireysel Ceza */}
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={() => removePenalty(playerIndex, 'individual')}
+                          disabled={playerScores[playerIndex]?.individualPenalty === 0}
+                          className="w-7 h-7 rounded-full bg-orange-700 text-orange-200 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-xs font-bold touch-manipulation"
+                          title="Bireysel ceza çıkar"
+                        >
+                          −
+                        </button>
+                        <span className="text-white font-medium min-w-[40px] text-center bg-gray-700 border border-gray-600 rounded-lg px-2 py-1 text-xs">
+                          {playerScores[playerIndex]?.individualPenalty || 0}
+                        </span>
+                        <button
+                          onClick={() => addPenalty(playerIndex, 'individual')}
+                          className="w-7 h-7 rounded-full bg-orange-700 text-orange-200 hover:bg-orange-600 transition-colors flex items-center justify-center text-xs font-bold touch-manipulation"
+                          title="Bireysel ceza ekle"
+                        >
+                          +
+                        </button>
+                      </div>
+                      
+                      {/* Takım Cezası - Sadece grup modunda */}
+                      {gameData.gameMode === 'group' && (
+                        <div className="flex items-center space-x-1">
+                          <button
+                            onClick={() => removePenalty(playerIndex, 'team')}
+                            disabled={playerScores[playerIndex]?.teamPenalty === 0}
+                            className="w-7 h-7 rounded-full bg-red-700 text-red-200 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-xs font-bold touch-manipulation"
+                            title="Takım cezası çıkar"
+                          >
+                            −
+                          </button>
+                          <span className="text-white font-medium min-w-[40px] text-center bg-gray-700 border border-gray-600 rounded-lg px-2 py-1 text-xs">
+                            {playerScores[playerIndex]?.teamPenalty || 0}
+                          </span>
+                          <button
+                            onClick={() => addPenalty(playerIndex, 'team')}
+                            className="w-7 h-7 rounded-full bg-red-700 text-red-200 hover:bg-red-600 transition-colors flex items-center justify-center text-xs font-bold touch-manipulation"
+                            title="Takım cezası ekle"
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Okey Buttons */}
                   <div className="flex justify-center space-x-2">
                     <button
                       onClick={() => toggleOkey(playerIndex, 1)}
-                      className={`w-9 h-9 rounded-lg text-sm font-bold transition-colors ${
+                      className={`w-9 h-9 rounded-lg text-sm font-bold transition-colors touch-manipulation ${
                         playerScores[playerIndex]?.hasOkey1
                           ? 'bg-amber-600 text-white shadow-lg'
                           : 'bg-amber-900/30 border border-amber-700 text-amber-300 hover:bg-amber-800/50'
                       }`}
+                      title="İlk Okey"
                     >
-                      1
+                      ⚪
                     </button>
                     <button
                       onClick={() => toggleOkey(playerIndex, 2)}
-                      className={`w-9 h-9 rounded-lg text-sm font-bold transition-colors ${
+                      className={`w-9 h-9 rounded-lg text-sm font-bold transition-colors touch-manipulation ${
                         playerScores[playerIndex]?.hasOkey2
                           ? 'bg-amber-600 text-white shadow-lg'
                           : 'bg-amber-900/30 border border-amber-700 text-amber-300 hover:bg-amber-800/50'
                       }`}
+                      title="İkinci Okey"
                     >
-                      2
+                      ⚪
                     </button>
                   </div>
 
@@ -548,15 +743,18 @@ function RoundPageContent() {
               <button
                 key={playerIndex}
                 onClick={() => toggleFinished(playerIndex)}
-                className={`py-4 px-4 rounded-xl text-base font-medium transition-all duration-200 flex items-center justify-between ${
-                  playerScores[playerIndex]?.finished
+                disabled={playerScores.some(score => score.handFinished)}
+                className={`py-4 px-4 rounded-xl text-base font-medium transition-all duration-200 flex items-center justify-between touch-manipulation ${
+                  playerScores[playerIndex]?.finished && !playerScores[playerIndex]?.handFinished
                     ? 'bg-green-600 text-white shadow-lg border-2 border-green-400'
+                    : playerScores.some(score => score.handFinished)
+                    ? 'bg-gray-600 text-gray-500 cursor-not-allowed border border-gray-500'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600 border border-gray-600'
                 }`}
               >
                 <span>{playerName}</span>
                 <span className="text-2xl">
-                  {playerScores[playerIndex]?.finished ? '✅' : '⭕'}
+                  {playerScores[playerIndex]?.finished && !playerScores[playerIndex]?.handFinished ? '✅' : '⭕'}
                 </span>
               </button>
             ))}
@@ -578,6 +776,58 @@ function RoundPageContent() {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Elden Bitirme Seçimi */}
+        <div className="bg-purple-800 border border-purple-700 rounded-2xl shadow-2xl p-6 mb-6">
+          <h3 className="text-lg font-semibold text-white mb-2">Elden Bitiren (-202 puan)</h3>
+          <p className="text-sm text-purple-300 mb-4">
+            {gameData.gameMode === 'group' 
+              ? 'Takım oyununda: Karşı takıma toplam 404 puan (202 puan + 202 bireysel ceza)' 
+              : 'Bireysel oyunda: Diğer oyunculara toplam 404 puan (202 puan + 202 bireysel ceza)'
+            }
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {gameData.players.map((playerName, playerIndex) => (
+              <button
+                key={playerIndex}
+                onClick={() => toggleHandFinished(playerIndex)}
+                disabled={playerScores.some(score => score.finished && !score.handFinished)}
+                className={`py-4 px-4 rounded-xl text-base font-medium transition-all duration-200 flex items-center justify-between touch-manipulation ${
+                  playerScores[playerIndex]?.handFinished
+                    ? 'bg-purple-600 text-white shadow-lg border-2 border-purple-400'
+                    : playerScores.some(score => score.finished && !score.handFinished)
+                    ? 'bg-gray-600 text-gray-500 cursor-not-allowed border border-gray-500'
+                    : 'bg-purple-700 text-purple-200 hover:bg-purple-600 border border-purple-600'
+                }`}
+              >
+                <span>{playerName}</span>
+                <span className="text-2xl">
+                  {playerScores[playerIndex]?.handFinished ? '🎯' : '⭕'}
+                </span>
+              </button>
+            ))}
+          </div>
+          
+          <div className="mt-4 space-y-3">
+            <div className="p-3 bg-purple-900/30 border border-purple-700 rounded-lg">
+              <p className="text-sm text-purple-300 flex items-center">
+                <span className="text-lg mr-2">🎯</span>
+                {gameData.gameMode === 'group' 
+                  ? 'Elden bitiren: -202 puan, eş: 0 puan, karşı takım: her oyuncuya toplam 404 puan (202 puan + 202 bireysel ceza)'
+                  : 'Elden bitiren: -202 puan, diğer oyuncular: her birine toplam 404 puan (202 puan + 202 bireysel ceza)'
+                }
+              </p>
+            </div>
+            
+            <div className="p-3 bg-red-900/30 border border-red-700 rounded-lg">
+              <p className="text-sm text-red-300 flex items-center">
+                <span className="text-lg mr-2">⚠️</span>
+                Bu seçenek tüm puanları otomatik hesaplar. Manual puan girişi devre dışı kalır.
+              </p>
+            </div>
           </div>
         </div>
 
