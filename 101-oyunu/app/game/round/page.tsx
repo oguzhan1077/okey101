@@ -434,13 +434,30 @@ function RoundPageContent() {
                      return (
                        <input
                          key={playerIndex}
-                         type="number"
+                         type="text"
+                         inputMode="numeric"
+                         pattern="^-?\d*$"
                          value={isDisabled ? '0' : inputValues[playerIndex]}
                          disabled={isDisabled}
                          onChange={(e) => {
                            if (isDisabled) return;
                            
-                           const value = e.target.value;
+                           let value = e.target.value;
+                           
+                           // Sadece sayı ve minus işareti kabul et
+                           if (!/^-?\d*$/.test(value)) {
+                             return; // Geçersiz karakterleri reddet
+                           }
+                           
+                           // Birden fazla minus işareti kontrolü
+                           if (value.split('-').length > 2) {
+                             return;
+                           }
+                           
+                           // Minus işareti sadece başta olabilir
+                           if (value.includes('-') && value.indexOf('-') !== 0) {
+                             return;
+                           }
                            
                            // Input değerini her zaman güncelle (görsel için)
                            const newInputValues = [...inputValues];
@@ -452,19 +469,18 @@ function RoundPageContent() {
                              updatePlayerScore(playerIndex, 'points', 0);
                            } else {
                              const numValue = parseInt(value);
-                             if (!isNaN(numValue)) {
+                             if (!isNaN(numValue) && numValue >= -999 && numValue <= 999) {
                                updatePlayerScore(playerIndex, 'points', numValue);
                              }
                            }
                          }}
-                         className={`w-full px-2 py-3 border rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm ${
+                         className={`w-full px-2 py-3 border rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-base ${
                            isDisabled 
                              ? 'bg-gray-600 border-gray-500 text-gray-400 cursor-not-allowed' 
                              : 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
                          }`}
                          placeholder={isDisabled ? "Takım arkadaşı bitirdi" : "0"}
-                         min="-999"
-                         max="999"
+                         maxLength={4}
                        />
                      );
                    })}
@@ -608,13 +624,30 @@ function RoundPageContent() {
                       const isDisabled = isPointInputDisabled(playerIndex);
                       return (
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="^-?\d*$"
                           value={isDisabled ? '0' : inputValues[playerIndex]}
                           disabled={isDisabled}
                           onChange={(e) => {
                             if (isDisabled) return;
                             
-                            const value = e.target.value;
+                            let value = e.target.value;
+                            
+                            // Sadece sayı ve minus işareti kabul et
+                            if (!/^-?\d*$/.test(value)) {
+                              return; // Geçersiz karakterleri reddet
+                            }
+                            
+                            // Birden fazla minus işareti kontrolü
+                            if (value.split('-').length > 2) {
+                              return;
+                            }
+                            
+                            // Minus işareti sadece başta olabilir
+                            if (value.includes('-') && value.indexOf('-') !== 0) {
+                              return;
+                            }
                             
                             // Input değerini her zaman güncelle (görsel için)
                             const newInputValues = [...inputValues];
@@ -626,19 +659,18 @@ function RoundPageContent() {
                               updatePlayerScore(playerIndex, 'points', 0);
                             } else {
                               const numValue = parseInt(value);
-                              if (!isNaN(numValue)) {
+                              if (!isNaN(numValue) && numValue >= -999 && numValue <= 999) {
                                 updatePlayerScore(playerIndex, 'points', numValue);
                               }
                             }
                           }}
-                          className={`w-full px-3 py-2 border rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors ${
+                          className={`w-full px-3 py-2 border rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-base ${
                             isDisabled 
                               ? 'bg-gray-600 border-gray-500 text-gray-400 cursor-not-allowed' 
                               : 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
                           }`}
                           placeholder={isDisabled ? "Takım arkadaşı bitirdi" : "0"}
-                          min="-999"
-                          max="999"
+                          maxLength={4}
                         />
                       );
                     })()}

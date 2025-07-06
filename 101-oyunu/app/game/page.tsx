@@ -413,6 +413,33 @@ function GamePageContent() {
       if (index === playerIndex) {
         const updatedPlayer = { ...player, [field]: value };
         
+        // Okey kontrolü - sadece bir oyuncuda olabilir
+        if (field === 'hasOkey1' && value === true) {
+          // Diğer oyuncuların okey1'ini false yap
+          editRoundData.players.forEach((p, i) => {
+            if (i !== playerIndex) {
+              updatedPlayers[i] = { ...updatedPlayers[i], hasOkey1: false };
+            }
+          });
+        } else if (field === 'hasOkey2' && value === true) {
+          // Diğer oyuncuların okey2'sini false yap
+          editRoundData.players.forEach((p, i) => {
+            if (i !== playerIndex) {
+              updatedPlayers[i] = { ...updatedPlayers[i], hasOkey2: false };
+            }
+          });
+        }
+        
+        // Finished kontrolü - sadece bir oyuncu bitebilir
+        if (field === 'finished' && value === true) {
+          // Diğer oyuncuların finished'ini false yap
+          editRoundData.players.forEach((p, i) => {
+            if (i !== playerIndex) {
+              updatedPlayers[i] = { ...updatedPlayers[i], finished: false };
+            }
+          });
+        }
+        
         // Recalculate total
         let total = updatedPlayer.points + updatedPlayer.penalty;
         if (updatedPlayer.finished) {
@@ -1061,24 +1088,70 @@ function GamePageContent() {
                       {/* Points */}
                       <div className="text-center">
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="^-?\d*$"
                           value={player.points}
-                          onChange={(e) => updateEditPlayerData(index, 'points', parseInt(e.target.value) || 0)}
-                          className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-center text-sm"
-                          min="-999"
-                          max="999"
+                          onChange={(e) => {
+                            let value = e.target.value;
+                            
+                            // Sadece sayı ve minus işareti kabul et
+                            if (!/^-?\d*$/.test(value)) {
+                              return; // Geçersiz karakterleri reddet
+                            }
+                            
+                            // Birden fazla minus işareti kontrolü
+                            if (value.split('-').length > 2) {
+                              return;
+                            }
+                            
+                            // Minus işareti sadece başta olabilir
+                            if (value.includes('-') && value.indexOf('-') !== 0) {
+                              return;
+                            }
+                            
+                            // Sayısal değeri hesapla ve kaydet
+                            if (value === '' || value === '-') {
+                              updateEditPlayerData(index, 'points', 0);
+                            } else {
+                              const numValue = parseInt(value);
+                              if (!isNaN(numValue) && numValue >= -999 && numValue <= 999) {
+                                updateEditPlayerData(index, 'points', numValue);
+                              }
+                            }
+                          }}
+                          className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-center text-base"
+                          maxLength={4}
                         />
                       </div>
 
                       {/* Penalty */}
                       <div className="text-center">
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="^\d*$"
                           value={player.penalty}
-                          onChange={(e) => updateEditPlayerData(index, 'penalty', parseInt(e.target.value) || 0)}
-                          className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-center text-sm"
-                          min="0"
-                          step="101"
+                          onChange={(e) => {
+                            let value = e.target.value;
+                            
+                            // Sadece sayı kabul et (ceza negatif olamaz)
+                            if (!/^\d*$/.test(value)) {
+                              return; // Geçersiz karakterleri reddet
+                            }
+                            
+                            // Sayısal değeri hesapla ve kaydet
+                            if (value === '') {
+                              updateEditPlayerData(index, 'penalty', 0);
+                            } else {
+                              const numValue = parseInt(value);
+                              if (!isNaN(numValue) && numValue >= 0 && numValue <= 9999) {
+                                updateEditPlayerData(index, 'penalty', numValue);
+                              }
+                            }
+                          }}
+                          className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-center text-base"
+                          maxLength={4}
                         />
                       </div>
 
@@ -1086,23 +1159,25 @@ function GamePageContent() {
                       <div className="text-center flex justify-center space-x-1">
                         <button
                           onClick={() => updateEditPlayerData(index, 'hasOkey1', !player.hasOkey1)}
-                          className={`w-6 h-6 rounded text-xs font-bold transition-colors ${
+                          className={`w-6 h-6 rounded-full text-xs font-bold transition-colors ${
                             player.hasOkey1
-                              ? 'bg-amber-600 text-white'
-                              : 'bg-amber-900/30 border border-amber-700 text-amber-300'
+                              ? 'bg-amber-600 text-white shadow-lg'
+                              : 'bg-amber-900/30 border border-amber-700 text-amber-300 hover:bg-amber-800/50'
                           }`}
+                          title="İlk Okey"
                         >
-                          1
+                          ⚪
                         </button>
                         <button
                           onClick={() => updateEditPlayerData(index, 'hasOkey2', !player.hasOkey2)}
-                          className={`w-6 h-6 rounded text-xs font-bold transition-colors ${
+                          className={`w-6 h-6 rounded-full text-xs font-bold transition-colors ${
                             player.hasOkey2
-                              ? 'bg-amber-600 text-white'
-                              : 'bg-amber-900/30 border border-amber-700 text-amber-300'
+                              ? 'bg-amber-600 text-white shadow-lg'
+                              : 'bg-amber-900/30 border border-amber-700 text-amber-300 hover:bg-amber-800/50'
                           }`}
+                          title="İkinci Okey"
                         >
-                          2
+                          ⚪
                         </button>
                       </div>
 
