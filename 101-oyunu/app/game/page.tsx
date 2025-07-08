@@ -236,7 +236,11 @@ function GamePageContent() {
 
     roundDetails.forEach(round => {
       const player = round.players[playerIndex];
-      if (player.hasOkey1 || player.hasOkey2) {
+      // Çift okey geldiğinde 2 kez saymalı
+      if (player.hasOkey1) {
+        totalOkey++;
+      }
+      if (player.hasOkey2) {
         totalOkey++;
       }
       if (player.finished && !player.handFinished) {
@@ -409,36 +413,10 @@ function GamePageContent() {
   const updateEditPlayerData = (playerIndex: number, field: string, value: any) => {
     if (!editRoundData) return;
 
+    // Önce tüm oyuncuları kopyala
     const updatedPlayers = editRoundData.players.map((player, index) => {
       if (index === playerIndex) {
         const updatedPlayer = { ...player, [field]: value };
-        
-        // Okey kontrolü - sadece bir oyuncuda olabilir
-        if (field === 'hasOkey1' && value === true) {
-          // Diğer oyuncuların okey1'ini false yap
-          editRoundData.players.forEach((p, i) => {
-            if (i !== playerIndex) {
-              updatedPlayers[i] = { ...updatedPlayers[i], hasOkey1: false };
-            }
-          });
-        } else if (field === 'hasOkey2' && value === true) {
-          // Diğer oyuncuların okey2'sini false yap
-          editRoundData.players.forEach((p, i) => {
-            if (i !== playerIndex) {
-              updatedPlayers[i] = { ...updatedPlayers[i], hasOkey2: false };
-            }
-          });
-        }
-        
-        // Finished kontrolü - sadece bir oyuncu bitebilir
-        if (field === 'finished' && value === true) {
-          // Diğer oyuncuların finished'ini false yap
-          editRoundData.players.forEach((p, i) => {
-            if (i !== playerIndex) {
-              updatedPlayers[i] = { ...updatedPlayers[i], finished: false };
-            }
-          });
-        }
         
         // Recalculate total
         let total = updatedPlayer.points + updatedPlayer.penalty;
@@ -449,8 +427,38 @@ function GamePageContent() {
         
         return updatedPlayer;
       }
-      return player;
+      return { ...player };
     });
+
+    // Sonra okey ve finished kontrollerini yap
+    if (field === 'hasOkey1' && value === true) {
+      // Diğer oyuncuların okey1'ini false yap
+      for (let i = 0; i < updatedPlayers.length; i++) {
+        if (i !== playerIndex) {
+          updatedPlayers[i] = { ...updatedPlayers[i], hasOkey1: false };
+        }
+      }
+    } else if (field === 'hasOkey2' && value === true) {
+      // Diğer oyuncuların okey2'sini false yap
+      for (let i = 0; i < updatedPlayers.length; i++) {
+        if (i !== playerIndex) {
+          updatedPlayers[i] = { ...updatedPlayers[i], hasOkey2: false };
+        }
+      }
+    } else if (field === 'finished' && value === true) {
+      // Diğer oyuncuların finished'ini false yap
+      for (let i = 0; i < updatedPlayers.length; i++) {
+        if (i !== playerIndex) {
+          updatedPlayers[i] = { ...updatedPlayers[i], finished: false };
+          // Finished değiştiğinde total'i yeniden hesapla
+          let total = updatedPlayers[i].points + updatedPlayers[i].penalty;
+          if (updatedPlayers[i].finished) {
+            total -= 101;
+          }
+          updatedPlayers[i].total = total;
+        }
+      }
+    }
 
     setEditRoundData({ ...editRoundData, players: updatedPlayers });
   };
