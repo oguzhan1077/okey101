@@ -267,7 +267,7 @@ export default function Home() {
         {gameMode && (
           <div className="mb-8">
             <h3 className="text-lg font-semibold text-gray-200 mb-4">
-              Oyuncu İsimleri <span className="text-xs text-gray-400">(Dağıtanı seçin)</span>
+              Oyuncu İsimleri <span className="text-xs text-gray-400">(Dealer seçin)</span>
             </h3>
             <div className="space-y-4">
               {gameMode === 'group' ? (

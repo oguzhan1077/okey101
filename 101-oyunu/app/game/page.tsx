@@ -551,12 +551,7 @@ function GamePageContent() {
                     </div>
                   )}
 
-                  {/* Dealer işareti - İsmin altında, küçük */}
-                  {gameData.dealerIndex === index && (
-                    <div className="flex justify-center mt-0.5">
-                      <span className="text-green-400 text-[10px]" title="Dağıtan">🟢</span>
-                    </div>
-                  )}
+                  
                   
                   {/* Puan - Sadece hesaplama gösterilirken */}
                   {showCalculation && (
@@ -569,6 +564,13 @@ function GamePageContent() {
                       <div className="text-[9px] sm:text-xs text-gray-400">puan</div>
                             </div>
       )}
+
+      {/* Dealer işareti - İsmin altında, küçük */}
+      {gameData.dealerIndex === index && (
+                    <div className="flex justify-center mt-0.5">
+                      <span className="text-green-400 text-[10px]" title="Dağıtan">🟢</span>
+                    </div>
+                  )}
 
       {/* Onay Modalı */}
       {showConfirmModal && (
