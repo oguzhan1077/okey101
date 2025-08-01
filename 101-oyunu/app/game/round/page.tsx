@@ -23,6 +23,7 @@ interface GameData {
   group2Name?: string;
   players: string[];
   currentRound: number;
+  dealerIndex: number; // Dağıtan oyuncunun indexi
 }
 
 function RoundPageContent() {
@@ -38,6 +39,7 @@ function RoundPageContent() {
     const group1 = searchParams.get('group1');
     const group2 = searchParams.get('group2');
     const round = parseInt(searchParams.get('round') || '1');
+    const dealerParam = searchParams.get('dealer');
     const playerNames = [
       searchParams.get('player1'),
       searchParams.get('player2'),
@@ -49,7 +51,8 @@ function RoundPageContent() {
       const data: GameData = {
         gameMode: mode,
         players: playerNames,
-        currentRound: round
+        currentRound: round,
+        dealerIndex: dealerParam ? parseInt(dealerParam) : 0,
       };
       
       if (mode === 'group') {
@@ -295,6 +298,9 @@ function RoundPageContent() {
     // Tüm puanları hesapla
     const roundScores = playerScores.map((_, index) => getTotal(index));
     
+    // Dealer'ı bir sonraki oyuncuya geçir
+    const nextDealer = (gameData.dealerIndex + 1) % gameData.players.length;
+    
     // Round detaylarını localStorage'e kaydet
     const roundDetails = {
       round: gameData.currentRound,
@@ -332,7 +338,8 @@ function RoundPageContent() {
       player3: gameData.players[2],
       player4: gameData.players[3],
       scores: roundScores.join(','),
-      round: gameData.currentRound.toString()
+      round: gameData.currentRound.toString(),
+      dealer: nextDealer.toString(), // Yeni dealer'ı ekle
     });
 
     if (gameData.gameMode === 'group') {

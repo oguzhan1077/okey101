@@ -17,6 +17,7 @@ export default function Home() {
   const [player4, setPlayer4] = useState('');
   const [hasOngoingGame, setHasOngoingGame] = useState(false);
   const [ongoingGameData, setOngoingGameData] = useState<any>(null);
+  const [dealerIndex, setDealerIndex] = useState<number>(0); // Dağıtan oyuncu indexi
 
   // localStorage'da devam eden oyun var mı kontrol et
   useEffect(() => {
@@ -94,7 +95,8 @@ export default function Home() {
         player1,
         player2,
         player3,
-        player4
+        player4,
+        dealer: dealerIndex.toString(),
       });
 
       if (gameMode === 'group') {
@@ -265,203 +267,69 @@ export default function Home() {
         {gameMode && (
           <div className="mb-8">
             <h3 className="text-lg font-semibold text-gray-200 mb-4">
-              Oyuncu İsimleri
+              Oyuncu İsimleri <span className="text-xs text-gray-400">(Dağıtanı seçin)</span>
             </h3>
             <div className="space-y-4">
               {gameMode === 'group' ? (
                 <>
                   <div className="grid grid-cols-1 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        {group1Name || '1. Takım'} - 1. Oyuncu
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Oyuncu 1"
-                        value={player1}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          // Sadece harfler, sayılar, nokta ve virgüle izin ver
-                          if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                            setPlayer1(value);
-                          }
-                        }}
-                        maxLength={20}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
-                      />
-                      <div className="flex justify-between items-center mt-1">
-                        <div className="text-xs text-gray-500">Maksimum 20 karakter (sadece harf, sayı, nokta, virgül)</div>
-                        <div className={`text-xs ${player1.length > 17 ? 'text-orange-400' : 'text-gray-500'}`}>
-                          {player1.length}/20
-                        </div>
+                    {[player1, player2, player3, player4].map((player, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="dealer"
+                          checked={dealerIndex === idx}
+                          onChange={() => setDealerIndex(idx)}
+                          className="accent-green-500 w-4 h-4"
+                          title="Dağıtan"
+                        />
+                        <input
+                          type="text"
+                          placeholder={`Oyuncu ${idx + 1}`}
+                          value={eval(`player${idx + 1}`)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
+                              eval(`setPlayer${idx + 1}`)(value);
+                            }
+                          }}
+                          maxLength={20}
+                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
+                        />
+                        <span className="text-xs text-green-400">{dealerIndex === idx ? '🟢' : ''}</span>
                       </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        {group2Name || '2. Takım'} - 1. Oyuncu
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Oyuncu 2"
-                        value={player2}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          // Sadece harfler, sayılar, nokta ve virgüle izin ver
-                          if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                            setPlayer2(value);
-                          }
-                        }}
-                        maxLength={20}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
-                      />
-                      <div className="flex justify-between items-center mt-1">
-                        <div className="text-xs text-gray-500">Maksimum 20 karakter (sadece harf, sayı, nokta, virgül)</div>
-                        <div className={`text-xs ${player2.length > 17 ? 'text-orange-400' : 'text-gray-500'}`}>
-                          {player2.length}/20
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        {group1Name || '1. Takım'} - 2. Oyuncu
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Oyuncu 3"
-                        value={player3}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          // Sadece harfler, sayılar, nokta ve virgüle izin ver
-                          if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                            setPlayer3(value);
-                          }
-                        }}
-                        maxLength={20}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
-                      />
-                      <div className="flex justify-between items-center mt-1">
-                        <div className="text-xs text-gray-500">Maksimum 20 karakter (sadece harf, sayı, nokta, virgül)</div>
-                        <div className={`text-xs ${player3.length > 17 ? 'text-orange-400' : 'text-gray-500'}`}>
-                          {player3.length}/20
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        {group2Name || '2. Takım'} - 2. Oyuncu
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Oyuncu 4"
-                        value={player4}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          // Sadece harfler, sayılar, nokta ve virgüle izin ver
-                          if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                            setPlayer4(value);
-                          }
-                        }}
-                        maxLength={20}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
-                      />
-                      <div className="flex justify-between items-center mt-1">
-                        <div className="text-xs text-gray-500">Maksimum 20 karakter (sadece harf, sayı, nokta, virgül)</div>
-                        <div className={`text-xs ${player4.length > 17 ? 'text-orange-400' : 'text-gray-500'}`}>
-                          {player4.length}/20
-                        </div>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </>
               ) : (
                 <>
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="1. Oyuncu"
-                      value={player1}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Sadece harfler, sayılar, nokta ve virgüle izin ver
-                        if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                          setPlayer1(value);
-                        }
-                      }}
-                      maxLength={20}
-                      className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
-                    />
-                    <div className="flex justify-between items-center mt-1">
-                      <div className="text-xs text-gray-500">Maksimum 20 karakter (sadece harf, sayı, nokta, virgül)</div>
-                      <div className={`text-xs ${player1.length > 17 ? 'text-orange-400' : 'text-gray-500'}`}>
-                        {player1.length}/20
+                  <div className="grid grid-cols-1 gap-4">
+                    {[player1, player2, player3, player4].map((player, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="dealer"
+                          checked={dealerIndex === idx}
+                          onChange={() => setDealerIndex(idx)}
+                          className="accent-green-500 w-4 h-4"
+                          title="Dağıtan"
+                        />
+                        <input
+                          type="text"
+                          placeholder={`Oyuncu ${idx + 1}`}
+                          value={eval(`player${idx + 1}`)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
+                              eval(`setPlayer${idx + 1}`)(value);
+                            }
+                          }}
+                          maxLength={20}
+                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
+                        />
+                        <span className="text-xs text-green-400">{dealerIndex === idx ? '🟢' : ''}</span>
                       </div>
-                    </div>
-                  </div>
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="2. Oyuncu"
-                      value={player2}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Sadece harfler, sayılar, nokta ve virgüle izin ver
-                        if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                          setPlayer2(value);
-                        }
-                      }}
-                      maxLength={20}
-                      className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
-                    />
-                    <div className="flex justify-between items-center mt-1">
-                      <div className="text-xs text-gray-500">Maksimum 20 karakter (sadece harf, sayı, nokta, virgül)</div>
-                      <div className={`text-xs ${player2.length > 17 ? 'text-orange-400' : 'text-gray-500'}`}>
-                        {player2.length}/20
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="3. Oyuncu"
-                      value={player3}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Sadece harfler, sayılar, nokta ve virgüle izin ver
-                        if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                          setPlayer3(value);
-                        }
-                      }}
-                      maxLength={20}
-                      className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
-                    />
-                    <div className="flex justify-between items-center mt-1">
-                      <div className="text-xs text-gray-500">Maksimum 20 karakter (sadece harf, sayı, nokta, virgül)</div>
-                      <div className={`text-xs ${player3.length > 17 ? 'text-orange-400' : 'text-gray-500'}`}>
-                        {player3.length}/20
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="4. Oyuncu"
-                      value={player4}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Sadece harfler, sayılar, nokta ve virgüle izin ver
-                        if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                          setPlayer4(value);
-                        }
-                      }}
-                      maxLength={20}
-                      className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
-                    />
-                    <div className="flex justify-between items-center mt-1">
-                      <div className="text-xs text-gray-500">Maksimum 20 karakter (sadece harf, sayı, nokta, virgül)</div>
-                      <div className={`text-xs ${player4.length > 17 ? 'text-orange-400' : 'text-gray-500'}`}>
-                        {player4.length}/20
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </>
               )}

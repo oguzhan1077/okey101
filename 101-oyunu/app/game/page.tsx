@@ -32,6 +32,7 @@ interface GameData {
   group1Name?: string;
   group2Name?: string;
   players: string[];
+  dealerIndex: number; // Dağıtan oyuncunun indexi
 }
 
 function GamePageContent() {
@@ -57,6 +58,7 @@ function GamePageContent() {
     const group2 = searchParams.get('group2');
     const scores = searchParams.get('scores');
     const round = searchParams.get('round');
+    const dealerParam = searchParams.get('dealer');
     const playerNames = [
       searchParams.get('player1'),
       searchParams.get('player2'),
@@ -67,7 +69,8 @@ function GamePageContent() {
     if (mode && playerNames.length === 4) {
       const data: GameData = {
         gameMode: mode,
-        players: playerNames
+        players: playerNames,
+        dealerIndex: dealerParam ? parseInt(dealerParam) : 0,
       };
       
       if (mode === 'group') {
@@ -127,7 +130,8 @@ function GamePageContent() {
       player2: gameData.players[1],
       player3: gameData.players[2],
       player4: gameData.players[3],
-      round: currentRound.toString()
+      round: currentRound.toString(),
+      dealer: gameData.dealerIndex.toString(), // Dealer bilgisini ekle
     });
 
     if (gameData.gameMode === 'group') {
@@ -400,6 +404,13 @@ function GamePageContent() {
     });
     setPlayers(updatedPlayers);
 
+    // Dealer'ı bir sonraki oyuncuya geçir
+    if (gameData) {
+      const nextDealer = (gameData.dealerIndex + 1) % players.length;
+      setGameData({ ...gameData, dealerIndex: nextDealer });
+      // localStorage veya başka bir yerde dealer bilgisini saklamak gerekiyorsa burada ekleyebilirsiniz
+    }
+
     setIsEditMode(false);
     setEditRoundData(null);
     setShowCalculation(false); // Reset calculation display
@@ -537,6 +548,13 @@ function GamePageContent() {
                       }`} style={{wordBreak: 'break-word'}}>
                         {isGroup1 ? gameData.group1Name : gameData.group2Name}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Dealer işareti - İsmin altında, küçük */}
+                  {gameData.dealerIndex === index && (
+                    <div className="flex justify-center mt-0.5">
+                      <span className="text-green-400 text-[10px]" title="Dağıtan">🟢</span>
                     </div>
                   )}
                   
