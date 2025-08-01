@@ -19,6 +19,22 @@ export default function Home() {
   const [ongoingGameData, setOngoingGameData] = useState<any>(null);
   const [dealerIndex, setDealerIndex] = useState<number>(0); // Dağıtan oyuncu indexi
 
+  // Takım renkleri
+  const teamColors = {
+    team1: {
+      name: 'text-blue-300',
+      border: 'border-blue-600',
+      bg: 'bg-blue-900/20',
+      focus: 'focus:ring-blue-500 focus:border-blue-600'
+    },
+    team2: {
+      name: 'text-purple-300',
+      border: 'border-purple-600',
+      bg: 'bg-purple-900/20',
+      focus: 'focus:ring-purple-500 focus:border-purple-600'
+    }
+  };
+
   // localStorage'da devam eden oyun var mı kontrol et
   useEffect(() => {
     const checkOngoingGame = () => {
@@ -273,7 +289,12 @@ export default function Home() {
               {gameMode === 'group' ? (
                 <>
                   <div className="grid grid-cols-1 gap-4">
-                    {[player1, player2, player3, player4].map((player, idx) => (
+                    {[
+                      { player: player1, setPlayer: setPlayer1, team: 'team1', teamName: group1Name, position: 1 },
+                      { player: player2, setPlayer: setPlayer2, team: 'team2', teamName: group2Name, position: 2 },
+                      { player: player3, setPlayer: setPlayer3, team: 'team1', teamName: group1Name, position: 3 },
+                      { player: player4, setPlayer: setPlayer4, team: 'team2', teamName: group2Name, position: 4 }
+                    ].map(({ player, setPlayer, team, teamName, position }, idx) => (
                       <div key={idx} className="flex items-center gap-2">
                         <input
                           type="radio"
@@ -283,19 +304,24 @@ export default function Home() {
                           className="accent-green-500 w-4 h-4"
                           title="Dağıtan"
                         />
-                        <input
-                          type="text"
-                          placeholder={`Oyuncu ${idx + 1}`}
-                          value={eval(`player${idx + 1}`)}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                              eval(`setPlayer${idx + 1}`)(value);
-                            }
-                          }}
-                          maxLength={20}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
-                        />
+                        <div className="flex-1">
+                          <div className={`text-xs font-medium mb-1 ${teamColors[team as keyof typeof teamColors].name}`}>
+                            {teamName || `${team === 'team1' ? '1.' : '2.'} Takım`}
+                          </div>
+                          <input
+                            type="text"
+                            placeholder={`Oyuncu ${position}`}
+                            value={player}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
+                                setPlayer(value);
+                              }
+                            }}
+                            maxLength={20}
+                            className={`w-full px-4 py-3 bg-gray-700 border-2 rounded-xl focus:ring-2 outline-none transition-colors text-white placeholder-gray-400 text-base ${teamColors[team as keyof typeof teamColors].border} ${teamColors[team as keyof typeof teamColors].focus}`}
+                          />
+                        </div>
                         <span className="text-xs text-green-400">{dealerIndex === idx ? '🟢' : ''}</span>
                       </div>
                     ))}
