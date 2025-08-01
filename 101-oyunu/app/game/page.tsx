@@ -1418,6 +1418,63 @@ function GamePageContent() {
                     </div>
                   </div>
                 )}
+
+                                {/* Eşek Mesajı - En Yüksek Puanlı Oyuncu */}
+                {(gameEndData.rankings || gameEndData.playersWithStats) && (() => {
+                  const lastPlayerName = gameEndData.isGroup 
+                    ? gameEndData.playersWithStats[gameEndData.playersWithStats.length - 1].name
+                    : gameEndData.rankings[gameEndData.rankings.length - 1].name;
+                  
+                                     // Oğuzhan kontrolü
+                   if (lastPlayerName.toLowerCase().includes('oğuzhan') || lastPlayerName.toLowerCase().includes('oguzhan')) {
+                     return (
+                       <div className="mt-4 p-4 bg-gradient-to-r from-purple-900/50 via-blue-900/30 to-red-900/40 border-2 border-purple-600 rounded-xl animate-pulse">
+                         <div className="text-center">
+                           <div className="text-4xl mb-3">⚡</div>
+                           <div className="text-purple-300 font-bold text-lg mb-2">
+                             🚨 KRİTİK SİSTEM UYARISI 🚨
+                           </div>
+                           <div className="text-blue-400 font-bold text-xl mb-2">
+                             ⚠️ PROTOKOL AKTİF ⚠️
+                           </div>
+                           <div className="text-red-400 font-semibold text-base mb-2">
+                             MESAJ BLOKE EDİLDİ
+                           </div>
+                           <div className="text-yellow-300 font-mono text-xs mb-2 bg-gray-800 p-2 rounded border border-gray-600">
+                             ERROR_CODE: OGUZHAN_DETECTED<br/>
+                             STATUS: MESSAGE_BLOCKED<br/>
+                             PRIORITY: CRITICAL<br/>
+                             TIMESTAMP: {new Date().toLocaleTimeString()}
+                           </div>
+                           <div className="text-purple-300/80 text-xs mt-2">
+                             🔒 Bu oyuncu için herhangi bir mesaj gösterilemez...<br/>
+                             🛡️ Sistem güvenlik protokolü devreye girdi
+                           </div>
+                         </div>
+                       </div>
+                     );
+                   }
+                  
+                  return (
+                    <div className="mt-4 p-4 bg-gradient-to-r from-orange-900/30 to-red-900/30 border border-orange-700 rounded-xl">
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">🫏</div>
+                        <div className="text-orange-300 font-semibold text-sm mb-1">
+                         🫏 Bugünün EŞŞEĞİ 🫏
+                        </div>
+                        <div className="text-orange-400 font-bold text-lg mb-1">
+                          {lastPlayerName}
+                        </div>
+                        <div className="text-orange-200 text-xs mb-2">
+                          {gameEndData.isGroup 
+                            ? gameEndData.playersWithStats[gameEndData.playersWithStats.length - 1].score
+                            : gameEndData.rankings[gameEndData.rankings.length - 1].score
+                          } puan ile "EŞŞŞŞŞEK" unvanını kazandı! 🏆
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Butonlar */}

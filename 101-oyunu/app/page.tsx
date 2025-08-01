@@ -322,7 +322,6 @@ export default function Home() {
                             className={`w-full px-4 py-3 bg-gray-700 border-2 rounded-xl focus:ring-2 outline-none transition-colors text-white placeholder-gray-400 text-base ${teamColors[team as keyof typeof teamColors].border} ${teamColors[team as keyof typeof teamColors].focus}`}
                           />
                         </div>
-                        <span className="text-xs text-green-400">{dealerIndex === idx ? '🟢' : ''}</span>
                       </div>
                     ))}
                   </div>
@@ -353,7 +352,6 @@ export default function Home() {
                           maxLength={20}
                           className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
                         />
-                        <span className="text-xs text-green-400">{dealerIndex === idx ? '🟢' : ''}</span>
                       </div>
                     ))}
                   </div>
