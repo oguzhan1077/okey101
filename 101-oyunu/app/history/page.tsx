@@ -295,16 +295,54 @@ export default function HistoryPage() {
                   <div className="text-2xl font-bold text-purple-400">{selectedGame.lowest_round_score}</div>
                   <div className="text-gray-400 mt-1">En Düşük Puan</div>
                 </div>
-                {selectedGame.game_mode === 'group' && (
-                  <div className="bg-gray-700/50 rounded-lg p-3 text-center">
-                    <div className="text-2xl font-bold text-indigo-400">
-                      {selectedGame.team1_total_score} - {selectedGame.team2_total_score}
-                    </div>
-                    <div className="text-gray-400 mt-1">Takım Skorları</div>
-                  </div>
-                )}
               </div>
             </div>
+
+            {/* Takım Skorları - Ayrı Kartlar */}
+            {selectedGame.game_mode === 'group' && (
+              <div className="mb-6">
+                <h3 className="text-lg font-bold text-white mb-3">🏆 Takım Skorları</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Takım 1 */}
+                  <div className={`rounded-lg p-4 text-center border-2 ${
+                    selectedGame.team1_total_score < selectedGame.team2_total_score 
+                      ? 'bg-green-900/20 border-green-500' 
+                      : 'bg-gray-700/50 border-gray-600'
+                  }`}>
+                    <div className="text-gray-300 font-semibold mb-2">{selectedGame.team1_name}</div>
+                    <div className={`text-4xl font-bold ${
+                      selectedGame.team1_total_score < selectedGame.team2_total_score 
+                        ? 'text-green-400' 
+                        : 'text-red-400'
+                    }`}>
+                      {selectedGame.team1_total_score}
+                    </div>
+                    {selectedGame.team1_total_score < selectedGame.team2_total_score && (
+                      <div className="text-green-400 text-sm mt-2">✓ Kazanan</div>
+                    )}
+                  </div>
+
+                  {/* Takım 2 */}
+                  <div className={`rounded-lg p-4 text-center border-2 ${
+                    selectedGame.team2_total_score < selectedGame.team1_total_score 
+                      ? 'bg-green-900/20 border-green-500' 
+                      : 'bg-gray-700/50 border-gray-600'
+                  }`}>
+                    <div className="text-gray-300 font-semibold mb-2">{selectedGame.team2_name}</div>
+                    <div className={`text-4xl font-bold ${
+                      selectedGame.team2_total_score < selectedGame.team1_total_score 
+                        ? 'text-green-400' 
+                        : 'text-red-400'
+                    }`}>
+                      {selectedGame.team2_total_score}
+                    </div>
+                    {selectedGame.team2_total_score < selectedGame.team1_total_score && (
+                      <div className="text-green-400 text-sm mt-2">✓ Kazanan</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Oyuncu İstatistikleri */}
             {selectedGame.player_stats && (
@@ -312,43 +350,65 @@ export default function HistoryPage() {
                 <h3 className="text-lg font-bold text-white mb-3">👥 Oyuncu Performansları (Sıralamalı)</h3>
                 <div className="space-y-2">
                   {selectedGame.player_stats
+                    .map((player: any, originalIndex: number) => ({ ...player, originalIndex }))
                     .sort((a: any, b: any) => a.total_score - b.total_score) // En düşük puan 1., en yüksek puan son
-                    .map((player: any, index: number) => (
-                      <div key={player.name} className="bg-gray-700/50 rounded-lg p-3 border-l-4" style={{
-                        borderLeftColor: index === 0 ? '#10B981' : index === 1 ? '#3B82F6' : index === 2 ? '#F59E0B' : '#EF4444'
-                      }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-lg font-bold ${
-                              index === 0 ? 'text-green-400' : 
-                              index === 1 ? 'text-blue-400' : 
-                              index === 2 ? 'text-yellow-400' : 
-                              'text-red-400'
-                            }`}>
-                              #{index + 1}
+                    .map((player: any, sortedIndex: number) => {
+                      // Takım rengini belirle (takım oyununda)
+                      let teamColor = '#FFFFFF'; // Varsayılan beyaz
+                      let borderColor = '#9CA3AF'; // Varsayılan gri
+                      
+                      if (selectedGame.game_mode === 'group') {
+                        // Oyuncu Takım 1'de mi (index 0 veya 2)?
+                        if (player.originalIndex === 0 || player.originalIndex === 2) {
+                          teamColor = selectedGame.team1_total_score < selectedGame.team2_total_score ? '#10B981' : '#EF4444';
+                          borderColor = teamColor;
+                        }
+                        // Oyuncu Takım 2'de mi (index 1 veya 3)?
+                        else if (player.originalIndex === 1 || player.originalIndex === 3) {
+                          teamColor = selectedGame.team2_total_score < selectedGame.team1_total_score ? '#10B981' : '#EF4444';
+                          borderColor = teamColor;
+                        }
+                      } else {
+                        // Tekli oyunda sıralama renklerine göre
+                        borderColor = sortedIndex === 0 ? '#10B981' : sortedIndex === 1 ? '#3B82F6' : sortedIndex === 2 ? '#F59E0B' : '#EF4444';
+                      }
+                      
+                      return (
+                        <div key={player.name} className="bg-gray-700/50 rounded-lg p-3 border-l-4" style={{
+                          borderLeftColor: borderColor
+                        }}>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-bold text-gray-400">
+                                #{sortedIndex + 1}
+                              </span>
+                              <span className="font-bold" style={{ 
+                                color: selectedGame.game_mode === 'group' ? teamColor : '#FFFFFF' 
+                              }}>
+                                {player.name}
+                              </span>
+                            </div>
+                            <span className={`font-bold ${player.total_score < 101 ? 'text-green-400' : 'text-red-400'}`}>
+                              {player.total_score} puan
                             </span>
-                            <span className="text-white font-bold">{player.name}</span>
                           </div>
-                          <span className={`font-bold ${player.total_score < 101 ? 'text-green-400' : 'text-red-400'}`}>
-                            {player.total_score} puan
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                          <div className="text-gray-300">
-                            🎯 Okey: <span className="text-yellow-400 font-semibold">{player.okey_count}</span>
-                          </div>
-                          <div className="text-gray-300">
-                            👤 Bireysel: <span className="text-orange-400 font-semibold">{player.individual_penalty || 0}</span>
-                          </div>
-                          <div className="text-gray-300">
-                            👥 Takım: <span className="text-purple-400 font-semibold">{player.team_penalty || 0}</span>
-                          </div>
-                          <div className="text-gray-300">
-                            ✅ Bitirdi: <span className="text-green-400 font-semibold">{player.finished_count}</span>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                            <div className="text-gray-300">
+                              🎯 Okey: <span className="text-yellow-400 font-semibold">{player.okey_count}</span>
+                            </div>
+                            <div className="text-gray-300">
+                              👤 Bireysel: <span className="text-orange-400 font-semibold">{player.individual_penalty || 0}</span>
+                            </div>
+                            <div className="text-gray-300">
+                              👥 Takım: <span className="text-purple-400 font-semibold">{player.team_penalty || 0}</span>
+                            </div>
+                            <div className="text-gray-300">
+                              ✅ Bitirdi: <span className="text-green-400 font-semibold">{player.finished_count}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
               </div>
             )}
