@@ -48,6 +48,10 @@ function GamePageContent() {
   const [gameEndData, setGameEndData] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editRoundData, setEditRoundData] = useState<RoundDetail | null>(null);
+  const [editInputValues, setEditInputValues] = useState<{points: string[], penalty: string[]}>({
+    points: ['', '', '', ''],
+    penalty: ['', '', '', '']
+  });
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'finish' | 'newGame' | null>(null);
 
@@ -382,6 +386,15 @@ function GamePageContent() {
     const detail = getRoundDetail(roundIndex);
     if (detail) {
       setEditRoundData(JSON.parse(JSON.stringify(detail))); // Deep copy
+      
+      // Input değerlerini ayarla (0 ise boş string, değilse değeri göster)
+      const pointsInputs = detail.players.map(p => p.points === 0 ? '' : p.points.toString());
+      const penaltyInputs = detail.players.map(p => p.penalty === 0 ? '' : p.penalty.toString());
+      setEditInputValues({
+        points: pointsInputs,
+        penalty: penaltyInputs
+      });
+      
       setIsEditMode(true);
     }
   };
@@ -404,12 +417,7 @@ function GamePageContent() {
     });
     setPlayers(updatedPlayers);
 
-    // Dealer'ı bir sonraki oyuncuya geçir
-    if (gameData) {
-      const nextDealer = (gameData.dealerIndex + 1) % players.length;
-      setGameData({ ...gameData, dealerIndex: nextDealer });
-      // localStorage veya başka bir yerde dealer bilgisini saklamak gerekiyorsa burada ekleyebilirsiniz
-    }
+    // Dealer değişikliği sadece yeni round eklenirken yapılmalı, düzenlemede değil
 
     setIsEditMode(false);
     setEditRoundData(null);
@@ -1119,7 +1127,7 @@ function GamePageContent() {
                           type="text"
                           inputMode="decimal"
                           pattern="^-?\d*$"
-                          value={player.points}
+                          value={editInputValues.points[index]}
                           onChange={(e) => {
                             let value = e.target.value;
                             
@@ -1138,6 +1146,11 @@ function GamePageContent() {
                               return;
                             }
                             
+                            // Input değerini her zaman güncelle (görsel için)
+                            const newInputValues = { ...editInputValues };
+                            newInputValues.points[index] = value;
+                            setEditInputValues(newInputValues);
+                            
                             // Sayısal değeri hesapla ve kaydet
                             if (value === '' || value === '-') {
                               updateEditPlayerData(index, 'points', 0);
@@ -1148,7 +1161,8 @@ function GamePageContent() {
                               }
                             }
                           }}
-                          className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-center text-base"
+                          className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-center text-base placeholder-gray-400"
+                          placeholder="0"
                           maxLength={4}
                         />
                       </div>
@@ -1159,7 +1173,7 @@ function GamePageContent() {
                           type="text"
                           inputMode="numeric"
                           pattern="^\d*$"
-                          value={player.penalty}
+                          value={editInputValues.penalty[index]}
                           onChange={(e) => {
                             let value = e.target.value;
                             
@@ -1167,6 +1181,11 @@ function GamePageContent() {
                             if (!/^\d*$/.test(value)) {
                               return; // Geçersiz karakterleri reddet
                             }
+                            
+                            // Input değerini her zaman güncelle (görsel için)
+                            const newInputValues = { ...editInputValues };
+                            newInputValues.penalty[index] = value;
+                            setEditInputValues(newInputValues);
                             
                             // Sayısal değeri hesapla ve kaydet
                             if (value === '') {
@@ -1178,7 +1197,8 @@ function GamePageContent() {
                               }
                             }
                           }}
-                          className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-center text-base"
+                          className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-center text-base placeholder-gray-400"
+                          placeholder="0"
                           maxLength={4}
                         />
                       </div>
@@ -1419,57 +1439,28 @@ function GamePageContent() {
                   </div>
                 )}
 
-                                {/* Eşek Mesajı - En Yüksek Puanlı Oyuncu */}
+                                {/* En Yüksek Puanlı Oyuncu */}
                 {(gameEndData.rankings || gameEndData.playersWithStats) && (() => {
                   const lastPlayerName = gameEndData.isGroup 
                     ? gameEndData.playersWithStats[gameEndData.playersWithStats.length - 1].name
                     : gameEndData.rankings[gameEndData.rankings.length - 1].name;
                   
-                                     // Oğuzhan kontrolü
-                   if (lastPlayerName.toLowerCase().includes('oğuzhan') || lastPlayerName.toLowerCase().includes('oguzhan')) {
-                     return (
-                       <div className="mt-4 p-4 bg-gradient-to-r from-purple-900/50 via-blue-900/30 to-red-900/40 border-2 border-purple-600 rounded-xl animate-pulse">
-                         <div className="text-center">
-                           <div className="text-4xl mb-3">⚡</div>
-                           <div className="text-purple-300 font-bold text-lg mb-2">
-                             🚨 KRİTİK SİSTEM UYARISI 🚨
-                           </div>
-                           <div className="text-blue-400 font-bold text-xl mb-2">
-                             ⚠️ PROTOKOL AKTİF ⚠️
-                           </div>
-                           <div className="text-red-400 font-semibold text-base mb-2">
-                             MESAJ BLOKE EDİLDİ
-                           </div>
-                           <div className="text-yellow-300 font-mono text-xs mb-2 bg-gray-800 p-2 rounded border border-gray-600">
-                             ERROR_CODE: OGUZHAN_DETECTED<br/>
-                             STATUS: MESSAGE_BLOCKED<br/>
-                             PRIORITY: CRITICAL<br/>
-                             TIMESTAMP: {new Date().toLocaleTimeString()}
-                           </div>
-                           <div className="text-purple-300/80 text-xs mt-2">
-                             🔒 Bu oyuncu için herhangi bir mesaj gösterilemez...<br/>
-                             🛡️ Sistem güvenlik protokolü devreye girdi
-                           </div>
-                         </div>
-                       </div>
-                     );
-                   }
+                  const lastPlayerScore = gameEndData.isGroup 
+                    ? gameEndData.playersWithStats[gameEndData.playersWithStats.length - 1].score
+                    : gameEndData.rankings[gameEndData.rankings.length - 1].score;
                   
                   return (
-                    <div className="mt-4 p-4 bg-gradient-to-r from-orange-900/30 to-red-900/30 border border-orange-700 rounded-xl">
+                    <div className="mt-4 p-4 bg-gradient-to-r from-gray-700/50 to-gray-600/50 border border-gray-500 rounded-xl">
                       <div className="text-center">
-                        <div className="text-3xl mb-2">🫏</div>
-                        <div className="text-orange-300 font-semibold text-sm mb-1">
-                         🫏 Bugünün EŞŞEĞİ 🫏
+                        <div className="text-3xl mb-2">📊</div>
+                        <div className="text-gray-300 font-semibold text-sm mb-1">
+                          En Yüksek Puan
                         </div>
-                        <div className="text-orange-400 font-bold text-lg mb-1">
+                        <div className="text-gray-400 font-bold text-lg mb-1">
                           {lastPlayerName}
                         </div>
-                        <div className="text-orange-200 text-xs mb-2">
-                          {gameEndData.isGroup 
-                            ? gameEndData.playersWithStats[gameEndData.playersWithStats.length - 1].score
-                            : gameEndData.rankings[gameEndData.rankings.length - 1].score
-                          } puan ile "EŞŞŞŞŞEK" unvanını kazandı! 🏆
+                        <div className="text-gray-200 text-xs mb-2">
+                          {lastPlayerScore} puan ile en yüksek skora sahip
                         </div>
                       </div>
                     </div>
