@@ -1,14 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useVenue } from '@/context/VenueContext';
 import Link from 'next/link';
 
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading, signOut } = useAuth();
+  const { venue, setVenue } = useVenue();
   const [gameMode, setGameMode] = useState<'group' | 'single' | null>(null);
+  const [venueLoading, setVenueLoading] = useState(false);
   const [group1Name, setGroup1Name] = useState('');
   const [group2Name, setGroup2Name] = useState('');
   const [player1, setPlayer1] = useState('');
@@ -35,23 +39,43 @@ export default function Home() {
     }
   };
 
-  // localStorage'da devam eden oyun var mı kontrol et
+  // QR kod ile venue yükleme
   useEffect(() => {
-    const checkOngoingGame = () => {
-      try {
-        const roundDetails = localStorage.getItem('roundDetails');
-        if (roundDetails) {
-          const gameData = JSON.parse(roundDetails);
-          if (gameData && gameData.length > 0) {
-            setHasOngoingGame(true);
-            // Son round'dan oyun bilgilerini al (en güncel)
-            const lastRound = gameData[gameData.length - 1];
-
-            setOngoingGameData(lastRound);
-          } else {
-            setHasOngoingGame(false);
-            setOngoingGameData(null);
+    const venueSlug = searchParams.get('venue');
+    if (venueSlug && !venue) {
+      setVenueLoading(true);
+      fetch(`/api/venues/${venueSlug}`)
+        .then(res => res.json())
+        .then(data => {
+          if (!data.error) {
+            setVenue(data);
           }
+        })
+        .catch(error => {
+          console.error('Venue yükleme hatası:', error);
+        })
+        .finally(() => {
+          setVenueLoading(false);
+        });
+    }
+  }, [searchParams, venue, setVenue]);
+
+  // localStorage'da devam eden oyun var mı kontrol et (süre kontrolü ile)
+  useEffect(() => {
+    const checkOngoingGame = async () => {
+      try {
+        // Önce süresi dolmuş oyunları temizle
+        const { cleanupExpiredGames, loadGameData } = await import('@/lib/gameStorage');
+        cleanupExpiredGames();
+        
+        // Oyun verilerini yükle
+        const gameData = loadGameData();
+        
+        if (gameData && gameData.roundDetails.length > 0) {
+          setHasOngoingGame(true);
+          // Son round'dan oyun bilgilerini al
+          const lastRound = gameData.roundDetails[gameData.roundDetails.length - 1];
+          setOngoingGameData(lastRound);
         } else {
           setHasOngoingGame(false);
           setOngoingGameData(null);
@@ -104,24 +128,53 @@ export default function Home() {
     return false;
   };
 
-  const handleStartGame = () => {
-    if (canStartGame()) {
-      const params = new URLSearchParams({
-        mode: gameMode!,
-        player1,
-        player2,
-        player3,
-        player4,
-        dealer: dealerIndex.toString(),
+  const handleStartGame = async () => {
+    if (!canStartGame()) return;
+
+    try {
+      // Supabase'e oyun kaydı oluştur (basit özet bilgiler)
+      const response = await fetch('/api/games', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          venue_id: venue?.id || null,
+          game_mode: gameMode,
+          team1_name: gameMode === 'group' ? group1Name : null,
+          team2_name: gameMode === 'group' ? group2Name : null,
+        }),
       });
 
-      if (gameMode === 'group') {
-        params.append('group1', group1Name);
-        params.append('group2', group2Name);
+      const game = await response.json();
+      
+      if (!response.ok) {
+        console.error('Oyun kaydı oluşturulamadı:', game.error);
+        // Hata olsa bile devam et (offline çalışma)
+      } else {
+        // Game ID'yi kaydet (yeni storage sistemi ile)
+        const { saveGameData } = await import('@/lib/gameStorage');
+        saveGameData([], game.id);
       }
-
-      router.push(`/game?${params.toString()}`);
+    } catch (error) {
+      console.error('Oyun kaydı hatası:', error);
+      // Hata olsa bile devam et
     }
+
+    // Oyun sayfasına yönlendir
+    const params = new URLSearchParams({
+      mode: gameMode!,
+      player1,
+      player2,
+      player3,
+      player4,
+      dealer: dealerIndex.toString(),
+    });
+
+    if (gameMode === 'group') {
+      params.append('group1', group1Name);
+      params.append('group2', group2Name);
+    }
+
+    router.push(`/game?${params.toString()}`);
   };
 
   // Loading durumu
@@ -133,30 +186,85 @@ export default function Home() {
     );
   }
 
-  // Kullanıcı giriş yapmamışsa auth ekranları göster
+  // Kullanıcı giriş yapmamışsa - anonim oyun veya auth seçenekleri göster
   if (!user) {
+    const bgStyle = venue 
+      ? { background: `linear-gradient(to bottom right, ${venue.primary_color}, ${venue.secondary_color})` }
+      : {};
+    
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
+      <div 
+        className="min-h-screen flex items-center justify-center p-4"
+        style={venue ? bgStyle : { background: 'linear-gradient(to bottom right, rgb(17, 24, 39), rgb(0, 0, 0))' }}
+      >
         <div className="max-w-md w-full">
           <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-8 text-center">
+            {/* Venue Logo ve Bilgi */}
+            {venue && (
+              <div className="mb-6 pb-6 border-b border-gray-700">
+                {venue.logo_url && (
+                  <img 
+                    src={venue.logo_url} 
+                    alt={venue.name} 
+                    className="h-16 mx-auto mb-3 object-contain"
+                  />
+                )}
+                <h2 className="text-2xl font-bold text-white mb-1">{venue.name}</h2>
+                {venue.welcome_message && (
+                  <p className="text-gray-300 text-sm">{venue.welcome_message}</p>
+                )}
+              </div>
+            )}
+            
             {/* Header */}
             <div className="mb-8">
               <h1 className="text-4xl font-bold text-white mb-2">101 Oyunu</h1>
               <p className="text-gray-300">Dijital skor takip uygulaması</p>
             </div>
 
-            {/* Auth Butonları */}
+            {/* Devam Eden Oyun Varsa */}
+            {hasOngoingGame && (
+              <div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-700 rounded-xl">
+                <p className="text-yellow-300 text-sm mb-3">
+                  📌 Devam eden oyununuz var
+                </p>
+                <button
+                  onClick={handleReturnToGame}
+                  className="w-full bg-yellow-600 hover:bg-yellow-500 text-white py-3 px-6 rounded-xl font-semibold transition-colors shadow-lg hover:shadow-xl"
+                >
+                  🎮 Oyuna Devam Et
+                </button>
+              </div>
+            )}
+
+            {/* Ana Seçenekler */}
             <div className="space-y-4">
+              <button
+                onClick={() => setGameMode('single')}
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white py-4 px-6 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl"
+              >
+                🎯 Misafir Olarak Oyna
+              </button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-600"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-gray-800 text-gray-400">veya</span>
+                </div>
+              </div>
+              
               <Link
                 href="/login"
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-6 rounded-xl font-semibold transition-colors shadow-lg hover:shadow-xl block"
+                className="w-full bg-green-600 hover:bg-green-500 text-white py-3 px-6 rounded-xl font-semibold transition-colors shadow-lg hover:shadow-xl block"
               >
                 🔐 Giriş Yap
               </Link>
               
               <Link
                 href="/register"
-                className="w-full bg-green-600 hover:bg-green-500 text-white py-3 px-6 rounded-xl font-semibold transition-colors shadow-lg hover:shadow-xl block"
+                className="w-full bg-gray-600 hover:bg-gray-500 text-white py-3 px-6 rounded-xl font-semibold transition-colors shadow-lg hover:shadow-xl block"
               >
                 📝 Kayıt Ol
               </Link>
@@ -165,7 +273,7 @@ export default function Home() {
             {/* Info */}
             <div className="mt-6 p-4 bg-blue-900/30 border border-blue-700 rounded-xl">
               <p className="text-blue-300 text-sm">
-                Oyun geçmişinizi kaydetmek ve takip etmek için hesap oluşturun
+                💡 Hesap oluşturarak oyun geçmişinizi kaydedebilir ve istatistiklerinizi takip edebilirsiniz
               </p>
             </div>
           </div>
@@ -174,8 +282,15 @@ export default function Home() {
     );
   }
 
+  const bgStyle = venue 
+    ? { background: `linear-gradient(to bottom right, ${venue.primary_color}, ${venue.secondary_color})` }
+    : {};
+  
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4"
+      style={venue ? bgStyle : { background: 'linear-gradient(to bottom right, rgb(17, 24, 39), rgb(0, 0, 0))' }}
+    >
       <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-8 w-full max-w-lg">
         {/* Kullanıcı Bilgisi ve Çıkış */}
         <div className="flex justify-between items-center mb-6">
@@ -183,13 +298,38 @@ export default function Home() {
             <p className="text-sm text-gray-400">Hoş geldiniz</p>
             <p className="text-white font-medium">{user.email}</p>
           </div>
-          <button
-            onClick={signOut}
-            className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors text-sm"
-          >
-            Çıkış
-          </button>
+          <div className="flex gap-2">
+            <Link
+              href="/history"
+              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+            >
+              📊 Geçmiş
+            </Link>
+            <button
+              onClick={signOut}
+              className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+            >
+              Çıkış
+            </button>
+          </div>
         </div>
+
+        {/* Venue Logo ve Bilgi */}
+        {venue && (
+          <div className="text-center mb-6 pb-6 border-b border-gray-700">
+            {venue.logo_url && (
+              <img 
+                src={venue.logo_url} 
+                alt={venue.name} 
+                className="h-16 mx-auto mb-3 object-contain"
+              />
+            )}
+            <h2 className="text-2xl font-bold text-white mb-1">{venue.name}</h2>
+            {venue.welcome_message && (
+              <p className="text-gray-300 text-sm">{venue.welcome_message}</p>
+            )}
+          </div>
+        )}
 
         {/* Başlık */}
         <div className="text-center mb-8">

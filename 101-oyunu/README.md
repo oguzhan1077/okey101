@@ -27,6 +27,11 @@ yarn install
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# Admin Configuration (Opsiyonel)
+# Venue oluşturmaya yetkili admin email adresleri (virgülle ayrılmış)
+# Boş bırakılırsa: Herhangi bir giriş yapmış kullanıcı venue oluşturabilir
+ADMIN_EMAILS=admin@example.com,owner@cafe.com
 ```
 
 ### 3. Geliştirme Sunucusunu Başlatın
@@ -63,6 +68,7 @@ Netlify dashboard'da:
 2. Aşağıdaki değişkenleri ekleyin:
    - `NEXT_PUBLIC_SUPABASE_URL`: Supabase proje URL'niz
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anonymous key'iniz
+   - `ADMIN_EMAILS` (Opsiyonel): Admin email listesi (örn: `admin@example.com,owner@cafe.com`)
 
 ### 4. Deploy İşlemini Tamamlayın
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useVenue } from '@/context/VenueContext';
 
 // Next.js 15 için dynamic rendering'e zorla
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,7 @@ interface GameData {
 function RoundPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { venue } = useVenue();
   const [gameData, setGameData] = useState<GameData | null>(null);
   const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
   const [inputValues, setInputValues] = useState<string[]>(['', '', '', '']);
@@ -78,36 +80,56 @@ function RoundPageContent() {
   }, []);
 
   const addPenalty = useCallback((playerIndex: number, type: 'individual' | 'team') => {
+    if (!gameData) return;
+    
     setPlayerScores(prev => prev.map((score, index) => {
-      if (index === playerIndex) {
+      if (type === 'individual' && index === playerIndex) {
+        // Bireysel ceza: Sadece bu oyuncuya
         const newScore = { ...score };
-        if (type === 'individual') {
-          newScore.individualPenalty = score.individualPenalty + 101;
-        } else {
-          newScore.teamPenalty = score.teamPenalty + 101;
-        }
+        newScore.individualPenalty = score.individualPenalty + 101;
         newScore.penalty = newScore.individualPenalty + newScore.teamPenalty;
         return newScore;
+      } else if (type === 'team' && gameData.gameMode === 'group') {
+        // Takım cezası: İki takım arkadaşına eşit bölün (her birine 50.5)
+        const isTeam1 = playerIndex === 0 || playerIndex === 2;
+        const isPlayerInTeam = (index === 0 || index === 2) === isTeam1;
+        
+        if (isPlayerInTeam) {
+          const newScore = { ...score };
+          newScore.teamPenalty = score.teamPenalty + 50.5; // 101 / 2
+          newScore.penalty = newScore.individualPenalty + newScore.teamPenalty;
+          return newScore;
+        }
       }
       return score;
     }));
-  }, []);
+  }, [gameData]);
 
   const removePenalty = useCallback((playerIndex: number, type: 'individual' | 'team') => {
+    if (!gameData) return;
+    
     setPlayerScores(prev => prev.map((score, index) => {
-      if (index === playerIndex) {
+      if (type === 'individual' && index === playerIndex) {
+        // Bireysel ceza çıkar: Sadece bu oyuncudan
         const newScore = { ...score };
-        if (type === 'individual') {
-          newScore.individualPenalty = Math.max(0, score.individualPenalty - 101);
-        } else {
-          newScore.teamPenalty = Math.max(0, score.teamPenalty - 101);
-        }
+        newScore.individualPenalty = Math.max(0, score.individualPenalty - 101);
         newScore.penalty = newScore.individualPenalty + newScore.teamPenalty;
         return newScore;
+      } else if (type === 'team' && gameData.gameMode === 'group') {
+        // Takım cezası çıkar: İki takım arkadaşından eşit çıkar (her birinden 50.5)
+        const isTeam1 = playerIndex === 0 || playerIndex === 2;
+        const isPlayerInTeam = (index === 0 || index === 2) === isTeam1;
+        
+        if (isPlayerInTeam) {
+          const newScore = { ...score };
+          newScore.teamPenalty = Math.max(0, score.teamPenalty - 50.5); // 101 / 2
+          newScore.penalty = newScore.individualPenalty + newScore.teamPenalty;
+          return newScore;
+        }
       }
       return score;
     }));
-  }, []);
+  }, [gameData]);
 
   const toggleOkey = useCallback((playerIndex: number, okeyNumber: 1 | 2) => {
     const okeyField = okeyNumber === 1 ? 'hasOkey1' : 'hasOkey2';
@@ -292,7 +314,7 @@ function RoundPageContent() {
     return total;
   }, [playerScores]);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!gameData) return;
 
     // Tüm puanları hesapla
@@ -301,7 +323,7 @@ function RoundPageContent() {
     // Dealer'ı bir sonraki oyuncuya geçir
     const nextDealer = (gameData.dealerIndex + 1) % gameData.players.length;
     
-    // Round detaylarını localStorage'e kaydet
+    // Round detaylarını oluştur
     const roundDetails = {
       round: gameData.currentRound,
       mode: gameData.gameMode,
@@ -325,10 +347,26 @@ function RoundPageContent() {
       }))
     };
     
-    // Mevcut detayları al ve yeni round'u ekle
+    // localStorage'e kaydet (yeni sistem ile - timestamp ekler)
     const existingDetails = JSON.parse(localStorage.getItem('roundDetails') || '[]');
     existingDetails.push(roundDetails);
-    localStorage.setItem('roundDetails', JSON.stringify(existingDetails));
+    
+    const { saveGameData } = await import('@/lib/gameStorage');
+    const gameId = localStorage.getItem('currentGameId');
+    saveGameData(existingDetails, gameId);
+
+    // Supabase'e sadece round sayısını kaydet (basit)
+    try {
+      const gameId = localStorage.getItem('currentGameId');
+      if (gameId) {
+        await fetch(`/api/games/${gameId}`, {
+          method: 'PATCH',
+        });
+      }
+    } catch (error) {
+      console.error('Round kaydetme hatası:', error);
+      // Hata olsa bile devam et (offline çalışma)
+    }
 
     // Game sayfasına geri dön ve puanları aktar
     const params = new URLSearchParams({
@@ -361,6 +399,22 @@ function RoundPageContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4">
       <div className="max-w-2xl mx-auto">
+        {/* Venue Badge (varsa) */}
+        {venue && (
+          <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 border border-blue-700 rounded-xl p-3 flex items-center justify-center gap-2 mb-6">
+            {venue.logo_url && (
+              <img 
+                src={venue.logo_url} 
+                alt={venue.name} 
+                className="h-6 w-6 object-contain"
+              />
+            )}
+            <span className="text-blue-300 font-semibold text-sm">
+              {venue.name}
+            </span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <button

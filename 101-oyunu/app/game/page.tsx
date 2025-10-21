@@ -2,6 +2,8 @@
 
 import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { useVenue } from '@/context/VenueContext';
 
 // Next.js 15 için dynamic rendering'e zorla
 export const dynamic = 'force-dynamic';
@@ -38,6 +40,8 @@ interface GameData {
 function GamePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user } = useAuth();
+  const { venue } = useVenue();
   const [gameData, setGameData] = useState<GameData | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentRound, setCurrentRound] = useState(1);
@@ -315,7 +319,81 @@ function GamePageContent() {
     setConfirmAction(null);
   };
 
-  const executeFinishGame = () => {
+  // Oyun istatistiklerini hesapla (Supabase için)
+  const calculateGameStatistics = (rounds: RoundDetail[], game: GameData) => {
+    const playerStats = game.players.map((playerName, playerIndex) => {
+      let totalScore = 0;
+      let okeyCount = 0;
+      let penaltyCount = 0;
+      let finishedCount = 0;
+      let individualPenaltyTotal = 0;
+      let teamPenaltyTotal = 0;
+
+      rounds.forEach(round => {
+        const playerData = round.players[playerIndex];
+        totalScore += playerData.total;
+        if (playerData.hasOkey1) okeyCount++;
+        if (playerData.hasOkey2) okeyCount++;
+        if (playerData.finished || playerData.handFinished) finishedCount++;
+        if (playerData.penalty > 0) penaltyCount++;
+        
+        // Bireysel ve takım cezalarını topla
+        individualPenaltyTotal += playerData.individualPenalty || 0;
+        teamPenaltyTotal += playerData.teamPenalty || 0;
+      });
+
+      return {
+        name: playerName,
+        total_score: totalScore,
+        okey_count: okeyCount,
+        penalty_count: penaltyCount,
+        finished_count: finishedCount,
+        individual_penalty: individualPenaltyTotal,
+        team_penalty: teamPenaltyTotal,
+      };
+    });
+
+    // Genel istatistikler
+    let totalOkeys = 0;
+    let totalPenalties = 0;
+    let totalFinishedHands = 0;
+    let highestRoundScore = 0;
+    let lowestRoundScore = 0;
+
+    rounds.forEach(round => {
+      round.players.forEach(player => {
+        if (player.hasOkey1) totalOkeys++;
+        if (player.hasOkey2) totalOkeys++;
+        if (player.penalty > 0) totalPenalties++;
+        if (player.finished || player.handFinished) totalFinishedHands++;
+        
+        // En yüksek ve en düşük round puanı
+        if (player.total > highestRoundScore) highestRoundScore = player.total;
+        if (player.total < lowestRoundScore || lowestRoundScore === 0) lowestRoundScore = player.total;
+      });
+    });
+
+    // Takım skorları (grup modu için)
+    let team1TotalScore = 0;
+    let team2TotalScore = 0;
+    if (game.gameMode === 'group') {
+      team1TotalScore = playerStats[0].total_score + playerStats[2].total_score;
+      team2TotalScore = playerStats[1].total_score + playerStats[3].total_score;
+    }
+
+    return {
+      players: playerStats,
+      total_okeys: totalOkeys,
+      total_penalties: totalPenalties,
+      total_finished_hands: totalFinishedHands,
+      highest_round_score: highestRoundScore,
+      lowest_round_score: lowestRoundScore,
+      team1_total_score: team1TotalScore,
+      team2_total_score: team2TotalScore,
+    };
+  };
+
+  const executeFinishGame = async () => {
     const groupScores = getGroupScores();
     
     // Tüm oyuncular için istatistikleri hesapla
@@ -360,14 +438,47 @@ function GamePageContent() {
       endData.winnerScore = playersWithStats[0].score;
     }
     
+    // Supabase'e oyun bitişini kaydet (özet + istatistikler)
+    try {
+      const gameId = localStorage.getItem('currentGameId');
+      if (gameId) {
+        // İstatistikleri hesapla
+        const gameStats = calculateGameStatistics(roundDetails, gameData!);
+        
+        const requestBody: any = { 
+          winner_name: endData.winner,
+          winner_type: endData.winnerType,
+        };
+
+        // Eğer kullanıcı girişliyse, user_id ve istatistikleri ekle
+        if (user) {
+          requestBody.user_id = user.id;
+          requestBody.game_statistics = gameStats;
+        }
+
+        await fetch(`/api/games/${gameId}/finish`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        });
+        
+        // Oyun bittiğinde gameId'yi temizle (tekrar finish edilmesin)
+        localStorage.removeItem('currentGameId');
+      }
+    } catch (error) {
+      console.error('Oyun bitirme kaydı hatası:', error);
+      // Hata olsa bile devam et
+    }
+    
     setGameEndData(endData);
     setShowGameEndModal(true);
     setShowCalculation(false); // Oyun bitince hesaplamayı kapat
   };
 
-  const executeNewGame = () => {
-    // Tüm localStorage verilerini temizle
-    localStorage.removeItem('roundDetails');
+  const executeNewGame = async () => {
+    // Tüm localStorage verilerini temizle (yeni sistem ile)
+    const { clearGameData } = await import('@/lib/gameStorage');
+    clearGameData();
     
     // Ana sayfaya git
     router.push('/');
@@ -407,7 +518,14 @@ function GamePageContent() {
       detail.round === editRoundData.round ? editRoundData : detail
     );
     setRoundDetails(updatedDetails);
-    localStorage.setItem('roundDetails', JSON.stringify(updatedDetails));
+    
+    // Yeni storage sistemi ile kaydet
+    const saveData = async () => {
+      const { saveGameData } = await import('@/lib/gameStorage');
+      const gameId = localStorage.getItem('currentGameId');
+      saveGameData(updatedDetails, gameId);
+    };
+    saveData();
 
     // Update player scores
     const updatedPlayers = players.map((player, index) => {
@@ -493,6 +611,22 @@ function GamePageContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4">
       <div className="max-w-4xl mx-auto space-y-6">
+        {/* Venue Badge (varsa) */}
+        {venue && (
+          <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 border border-blue-700 rounded-xl p-3 flex items-center justify-center gap-2">
+            {venue.logo_url && (
+              <img 
+                src={venue.logo_url} 
+                alt={venue.name} 
+                className="h-6 w-6 object-contain"
+              />
+            )}
+            <span className="text-blue-300 font-semibold text-sm">
+              {venue.name}
+            </span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-4 md:p-6">
           <h1 className="text-2xl md:text-3xl font-bold text-white mb-4 md:mb-6 text-center">101 Oyunu</h1>
@@ -1481,9 +1615,13 @@ function GamePageContent() {
                 </button>
                 
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setShowGameEndModal(false);
-                    // Sadece modalı kapat, oyun verilerini sakla
+                    // Oyun verilerini temizle
+                    const { clearGameData } = await import('@/lib/gameStorage');
+                    clearGameData();
+                    // Ana sayfaya yönlendir
+                    router.push('/');
                   }}
                   className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg font-medium transition-colors"
                 >
