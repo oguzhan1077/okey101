@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useVenue } from '@/context/VenueContext';
 import Link from 'next/link';
 import { cleanupExpiredGames, loadGameData, saveGameData } from '@/lib/gameStorage';
 
-export default function Home() {
+export const dynamic = 'force-dynamic';
+
+function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading, signOut } = useAuth();
@@ -533,5 +535,17 @@ export default function Home() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+        <div className="text-gray-300 text-xl">Yükleniyor...</div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }
