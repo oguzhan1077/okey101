@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
@@ -96,15 +96,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const value: AuthContextType = {
-    user,
-    session,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-    isSupabaseReady,
-  }
+  const value = useMemo<AuthContextType>(
+    () => ({ user, session, loading, signIn, signUp, signOut, isSupabaseReady }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, session, loading, isSupabaseReady]
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

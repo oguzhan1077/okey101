@@ -14,9 +14,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Force dynamic rendering - static generation'ı kapat
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
   title: "101 Oyunu",
   description: "Dijital skor takip uygulaması",

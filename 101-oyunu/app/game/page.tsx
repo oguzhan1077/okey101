@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useVenue } from '@/context/VenueContext';
+import { saveGameData, clearGameData } from '@/lib/gameStorage';
 
 // Next.js 15 için dynamic rendering'e zorla
 export const dynamic = 'force-dynamic';
@@ -454,6 +455,9 @@ function GamePageContent() {
         if (user) {
           requestBody.user_id = user.id;
           requestBody.game_statistics = gameStats;
+          // Uygulama hangi oyuncunun giriş yapmış kullanıcı olduğunu bilmiyor,
+          // bu yüzden kazanma bilgisini şimdilik false gönderiyoruz.
+          requestBody.user_won = false;
         }
 
         await fetch(`/api/games/${gameId}/finish`, {
@@ -477,7 +481,6 @@ function GamePageContent() {
 
   const executeNewGame = async () => {
     // Tüm localStorage verilerini temizle (yeni sistem ile)
-    const { clearGameData } = await import('@/lib/gameStorage');
     clearGameData();
     
     // Ana sayfaya git
@@ -520,12 +523,8 @@ function GamePageContent() {
     setRoundDetails(updatedDetails);
     
     // Yeni storage sistemi ile kaydet
-    const saveData = async () => {
-      const { saveGameData } = await import('@/lib/gameStorage');
-      const gameId = localStorage.getItem('currentGameId');
-      saveGameData(updatedDetails, gameId);
-    };
-    saveData();
+    const gameId = localStorage.getItem('currentGameId');
+    saveGameData(updatedDetails, gameId);
 
     // Update player scores
     const updatedPlayers = players.map((player, index) => {
@@ -555,9 +554,9 @@ function GamePageContent() {
       if (index === playerIndex) {
         const updatedPlayer = { ...player, [field]: value };
         
-        // Recalculate total
+        // Recalculate total (handFinished oyuncunun puanı zaten -202, ayrıca -101 uygulanmamalı)
         let total = updatedPlayer.points + updatedPlayer.penalty;
-        if (updatedPlayer.finished) {
+        if (updatedPlayer.finished && !updatedPlayer.handFinished) {
           total -= 101;
         }
         updatedPlayer.total = total;
@@ -1615,12 +1614,9 @@ function GamePageContent() {
                 </button>
                 
                 <button
-                  onClick={async () => {
+                  onClick={() => {
                     setShowGameEndModal(false);
-                    // Oyun verilerini temizle
-                    const { clearGameData } = await import('@/lib/gameStorage');
                     clearGameData();
-                    // Ana sayfaya yönlendir
                     router.push('/');
                   }}
                   className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg font-medium transition-colors"

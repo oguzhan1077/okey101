@@ -6,30 +6,24 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Round ekle (sadece sayıyı güncelle - basitleştirilmiş)
+// Round ekle (client'tan gelen round sayısını direkt yaz - tek sorgu)
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
+    const body = await request.json().catch(() => ({}));
+    const total_rounds = typeof body.total_rounds === 'number' ? body.total_rounds : null;
 
-    // Mevcut oyunu getir
-    const { data: game } = await supabase
-      .from('games')
-      .select('total_rounds')
-      .eq('id', id)
-      .single();
+    if (total_rounds === null) {
+      return NextResponse.json({ error: 'total_rounds required' }, { status: 400 });
+    }
 
-    // Round sayısını artır
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('games')
-      .update({
-        total_rounds: (game?.total_rounds || 0) + 1,
-      })
-      .eq('id', id)
-      .select()
-      .single();
+      .update({ total_rounds })
+      .eq('id', id);
 
     if (error) {
       console.error('Game update error:', error);
@@ -39,7 +33,7 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('Error updating game:', error);
     return NextResponse.json(

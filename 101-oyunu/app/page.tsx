@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useVenue } from '@/context/VenueContext';
 import Link from 'next/link';
+import { cleanupExpiredGames, loadGameData, saveGameData } from '@/lib/gameStorage';
 
 export default function Home() {
   const router = useRouter();
@@ -65,7 +66,6 @@ export default function Home() {
     const checkOngoingGame = async () => {
       try {
         // Önce süresi dolmuş oyunları temizle
-        const { cleanupExpiredGames, loadGameData } = await import('@/lib/gameStorage');
         cleanupExpiredGames();
         
         // Oyun verilerini yükle
@@ -151,7 +151,6 @@ export default function Home() {
         // Hata olsa bile devam et (offline çalışma)
       } else {
         // Game ID'yi kaydet (yeni storage sistemi ile)
-        const { saveGameData } = await import('@/lib/gameStorage');
         saveGameData([], game.id);
       }
     } catch (error) {

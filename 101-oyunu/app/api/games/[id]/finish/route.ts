@@ -14,7 +14,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { winner_name, winner_type, user_id, game_statistics } = body;
+    const { winner_name, winner_type, user_id, game_statistics, user_won } = body;
 
     // Önce oyunun zaten bitip bitmediğini kontrol et
     const { data: existingGame } = await supabase
@@ -71,7 +71,7 @@ export async function PATCH(
 
     // Kullanıcı profilini güncelle (varsa)
     if (user_id) {
-      await updateUserProfile(user_id, data.game_mode, winner_type, data.total_rounds);
+      await updateUserProfile(user_id, data.game_mode, user_won === true, data.total_rounds);
     }
 
     return NextResponse.json(data);
@@ -163,7 +163,7 @@ async function saveGameStatistics(
 async function updateUserProfile(
   userId: string,
   gameMode: string,
-  winnerType: string,
+  isWinner: boolean,
   totalRounds: number
 ) {
   try {
@@ -173,8 +173,6 @@ async function updateUserProfile(
       .select('*')
       .eq('id', userId)
       .single();
-
-    const isWinner = winnerType !== 'tie'; // Beraberlik değilse kazanan var demektir
     
     if (profile) {
       // Güncelle
