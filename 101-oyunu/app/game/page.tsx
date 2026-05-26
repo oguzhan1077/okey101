@@ -4,7 +4,6 @@ import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useVenue } from '@/context/VenueContext';
-import { saveGameData, clearGameData } from '@/lib/gameStorage';
 
 // Next.js 15 için dynamic rendering'e zorla
 export const dynamic = 'force-dynamic';
@@ -480,10 +479,8 @@ function GamePageContent() {
   };
 
   const executeNewGame = async () => {
-    // Tüm localStorage verilerini temizle (yeni sistem ile)
-    clearGameData();
-    
-    // Ana sayfaya git
+    localStorage.removeItem('roundDetails');
+    localStorage.removeItem('currentGameId');
     router.push('/');
     setShowCalculation(false); // Yeni oyun başlarken hesaplamayı kapat
   };
@@ -522,9 +519,7 @@ function GamePageContent() {
     );
     setRoundDetails(updatedDetails);
     
-    // Yeni storage sistemi ile kaydet
-    const gameId = localStorage.getItem('currentGameId');
-    saveGameData(updatedDetails, gameId);
+    localStorage.setItem('roundDetails', JSON.stringify(updatedDetails));
 
     // Update player scores
     const updatedPlayers = players.map((player, index) => {
@@ -1616,7 +1611,8 @@ function GamePageContent() {
                 <button
                   onClick={() => {
                     setShowGameEndModal(false);
-                    clearGameData();
+                    localStorage.removeItem('roundDetails');
+                    localStorage.removeItem('currentGameId');
                     router.push('/');
                   }}
                   className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg font-medium transition-colors"

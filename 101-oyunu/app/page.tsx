@@ -5,8 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useVenue } from '@/context/VenueContext';
 import Link from 'next/link';
-import { cleanupExpiredGames, loadGameData, saveGameData } from '@/lib/gameStorage';
-
 export const dynamic = 'force-dynamic';
 
 function HomeContent() {
@@ -63,62 +61,32 @@ function HomeContent() {
     }
   }, [searchParams, venue, setVenue]);
 
-  // localStorage'da devam eden oyun var mı kontrol et (süre kontrolü ile)
   useEffect(() => {
-    const checkOngoingGame = async () => {
-      try {
-        // Önce süresi dolmuş oyunları temizle
-        cleanupExpiredGames();
-        
-        // Oyun verilerini yükle
-        const gameData = loadGameData();
-        
-        if (gameData && gameData.roundDetails.length > 0) {
-          setHasOngoingGame(true);
-          // Son round'dan oyun bilgilerini al
-          const lastRound = gameData.roundDetails[gameData.roundDetails.length - 1];
-          setOngoingGameData(lastRound);
-        } else {
-          setHasOngoingGame(false);
-          setOngoingGameData(null);
-        }
-      } catch (error) {
-        console.error('localStorage kontrol hatası:', error);
-        setHasOngoingGame(false);
-        setOngoingGameData(null);
+    try {
+      const stored = localStorage.getItem('roundDetails');
+      const roundDetails = stored ? JSON.parse(stored) : [];
+      if (roundDetails.length > 0) {
+        setHasOngoingGame(true);
+        setOngoingGameData(roundDetails[roundDetails.length - 1]);
       }
-    };
-
-    checkOngoingGame();
+    } catch {
+      setHasOngoingGame(false);
+    }
   }, []);
 
   const handleReturnToGame = () => {
-    if (ongoingGameData) {
-      
-      // Yeni veri formatı kullan, eski format için fallback
-      const mode = ongoingGameData.mode || 'single';
-      const player1 = ongoingGameData.player1 || (ongoingGameData.players && ongoingGameData.players[0]?.name) || '';
-      const player2 = ongoingGameData.player2 || (ongoingGameData.players && ongoingGameData.players[1]?.name) || '';
-      const player3 = ongoingGameData.player3 || (ongoingGameData.players && ongoingGameData.players[2]?.name) || '';
-      const player4 = ongoingGameData.player4 || (ongoingGameData.players && ongoingGameData.players[3]?.name) || '';
-      
-      // Oyun verilerinden URL parametrelerini oluştur
-      const params = new URLSearchParams({
-        mode,
-        player1,
-        player2,
-        player3,
-        player4
-      });
-
-      if (mode === 'group' && ongoingGameData.group1 && ongoingGameData.group2) {
-        params.append('group1', ongoingGameData.group1);
-        params.append('group2', ongoingGameData.group2);
-      }
-
-
-      router.push(`/game?${params.toString()}`);
+    if (!ongoingGameData) return;
+    const mode = ongoingGameData.mode || 'single';
+    const p1 = ongoingGameData.player1 || ongoingGameData.players?.[0]?.name || '';
+    const p2 = ongoingGameData.player2 || ongoingGameData.players?.[1]?.name || '';
+    const p3 = ongoingGameData.player3 || ongoingGameData.players?.[2]?.name || '';
+    const p4 = ongoingGameData.player4 || ongoingGameData.players?.[3]?.name || '';
+    const params = new URLSearchParams({ mode, player1: p1, player2: p2, player3: p3, player4: p4 });
+    if (mode === 'group' && ongoingGameData.group1 && ongoingGameData.group2) {
+      params.append('group1', ongoingGameData.group1);
+      params.append('group2', ongoingGameData.group2);
     }
+    router.push(`/game?${params.toString()}`);
   };
 
   const canStartGame = () => {
@@ -152,8 +120,7 @@ function HomeContent() {
         console.error('Oyun kaydı oluşturulamadı:', game.error);
         // Hata olsa bile devam et (offline çalışma)
       } else {
-        // Game ID'yi kaydet (yeni storage sistemi ile)
-        saveGameData([], game.id);
+        localStorage.setItem('currentGameId', game.id);
       }
     } catch (error) {
       console.error('Oyun kaydı hatası:', error);

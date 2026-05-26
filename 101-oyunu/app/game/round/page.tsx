@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useVenue } from '@/context/VenueContext';
-import { saveGameData } from '@/lib/gameStorage';
 
 // Next.js 15 için dynamic rendering'e zorla
 export const dynamic = 'force-dynamic';
@@ -348,12 +347,11 @@ function RoundPageContent() {
       }))
     };
     
-    // localStorage'e kaydet (yeni sistem ile - timestamp ekler)
     const existingDetails = JSON.parse(localStorage.getItem('roundDetails') || '[]');
     existingDetails.push(roundDetails);
+    localStorage.setItem('roundDetails', JSON.stringify(existingDetails));
 
     const gameId = localStorage.getItem('currentGameId');
-    saveGameData(existingDetails, gameId);
 
     // Supabase'e round sayısını kaydet - await YOK, arka planda çalışır
     if (gameId) {
