@@ -551,18 +551,18 @@ function GamePageContent() {
             <span className="text-xs text-l2">Skorlar</span>
           </button>
           <button
-            onClick={finishGame}
-            className="bg-[var(--danger-bg)] hover:opacity-90 active:scale-[0.97] border border-[var(--danger-border)] text-ared py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
-          >
-            <FlagIcon />
-            <span className="text-xs">Bitir</span>
-          </button>
-          <button
             onClick={startNewGame}
             className="bg-s2 hover:opacity-90 active:scale-[0.97] border border-sep py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
           >
             <RefreshIcon className="w-5 h-5 text-ablue" />
             <span className="text-xs text-l3">Yeni Oyun</span>
+          </button>
+          <button
+            onClick={finishGame}
+            className="bg-[var(--danger-bg)] hover:opacity-90 active:scale-[0.97] border border-[var(--danger-border)] text-ared py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
+          >
+            <FlagIcon />
+            <span className="text-xs">Bitir</span>
           </button>
         </div>
       </div>
