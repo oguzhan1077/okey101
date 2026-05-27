@@ -6,7 +6,13 @@ module.exports = {
     './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      boxShadow: {
+        'glow-green': '0 0 24px rgba(34,197,94,0.25)',
+        'glow-sky': '0 0 24px rgba(56,189,248,0.25)',
+        'glow-amber': '0 0 24px rgba(245,158,11,0.25)',
+      },
+    },
   },
   plugins: [],
-} 
+}

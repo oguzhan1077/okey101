@@ -5,7 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useVenue } from '@/context/VenueContext';
 import Link from 'next/link';
+
 export const dynamic = 'force-dynamic';
+
+const NAME_REGEX = /^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/;
+
+const inputBase = 'w-full px-4 py-3.5 bg-white/[0.06] border rounded-xl text-white text-base transition-colors';
 
 function HomeContent() {
   const router = useRouter();
@@ -22,42 +27,17 @@ function HomeContent() {
   const [player4, setPlayer4] = useState('');
   const [hasOngoingGame, setHasOngoingGame] = useState(false);
   const [ongoingGameData, setOngoingGameData] = useState<any>(null);
-  const [dealerIndex, setDealerIndex] = useState<number>(0); // Dağıtan oyuncu indexi
+  const [dealerIndex, setDealerIndex] = useState<number>(0);
 
-  // Takım renkleri
-  const teamColors = {
-    team1: {
-      name: 'text-blue-300',
-      border: 'border-blue-600',
-      bg: 'bg-blue-900/20',
-      focus: 'focus:ring-blue-500 focus:border-blue-600'
-    },
-    team2: {
-      name: 'text-purple-300',
-      border: 'border-purple-600',
-      bg: 'bg-purple-900/20',
-      focus: 'focus:ring-purple-500 focus:border-purple-600'
-    }
-  };
-
-  // QR kod ile venue yükleme
   useEffect(() => {
     const venueSlug = searchParams.get('venue');
     if (venueSlug && !venue) {
       setVenueLoading(true);
       fetch(`/api/venues/${venueSlug}`)
         .then(res => res.json())
-        .then(data => {
-          if (!data.error) {
-            setVenue(data);
-          }
-        })
-        .catch(error => {
-          console.error('Venue yükleme hatası:', error);
-        })
-        .finally(() => {
-          setVenueLoading(false);
-        });
+        .then(data => { if (!data.error) setVenue(data); })
+        .catch(error => console.error('Venue yükleme hatası:', error))
+        .finally(() => setVenueLoading(false));
     }
   }, [searchParams, venue, setVenue]);
 
@@ -100,9 +80,7 @@ function HomeContent() {
 
   const handleStartGame = async () => {
     if (!canStartGame()) return;
-
     try {
-      // Supabase'e oyun kaydı oluştur (basit özet bilgiler)
       const response = await fetch('/api/games', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,393 +91,357 @@ function HomeContent() {
           team2_name: gameMode === 'group' ? group2Name : null,
         }),
       });
-
       const game = await response.json();
-      
       if (!response.ok) {
         console.error('Oyun kaydı oluşturulamadı:', game.error);
-        // Hata olsa bile devam et (offline çalışma)
       } else {
         localStorage.setItem('currentGameId', game.id);
       }
     } catch (error) {
       console.error('Oyun kaydı hatası:', error);
-      // Hata olsa bile devam et
     }
-
-    // Oyun sayfasına yönlendir
     const params = new URLSearchParams({
       mode: gameMode!,
-      player1,
-      player2,
-      player3,
-      player4,
+      player1, player2, player3, player4,
       dealer: dealerIndex.toString(),
     });
-
     if (gameMode === 'group') {
       params.append('group1', group1Name);
       params.append('group2', group2Name);
     }
-
     router.push(`/game?${params.toString()}`);
   };
 
-  // Loading durumu
+  const playerList = [
+    { value: player1, setter: setPlayer1 },
+    { value: player2, setter: setPlayer2 },
+    { value: player3, setter: setPlayer3 },
+    { value: player4, setter: setPlayer4 },
+  ];
+
+  const groupPlayerList = [
+    { value: player1, setter: setPlayer1, team: 'sky' as const, teamLabel: group1Name || '1. Takım', pos: 1 },
+    { value: player2, setter: setPlayer2, team: 'violet' as const, teamLabel: group2Name || '2. Takım', pos: 2 },
+    { value: player3, setter: setPlayer3, team: 'sky' as const, teamLabel: group1Name || '1. Takım', pos: 3 },
+    { value: player4, setter: setPlayer4, team: 'violet' as const, teamLabel: group2Name || '2. Takım', pos: 4 },
+  ];
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
-        <div className="text-white text-xl">Yükleniyor...</div>
+      <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center">
+        <div className="text-white/30 text-sm">Yükleniyor...</div>
       </div>
     );
   }
 
-  // Kullanıcı giriş yapmamışsa - anonim oyun veya auth seçenekleri göster
-  if (!user) {
-    const bgStyle = venue 
-      ? { background: `linear-gradient(to bottom right, ${venue.primary_color}, ${venue.secondary_color})` }
-      : {};
-    
+  /* ─── Misafir: oyun kurulum ekranı ─── */
+  if (!user && gameMode !== null) {
     return (
-      <div 
-        className="min-h-screen flex items-center justify-center p-4"
-        style={venue ? bgStyle : { background: 'linear-gradient(to bottom right, rgb(17, 24, 39), rgb(0, 0, 0))' }}
-      >
-        <div className="max-w-md w-full">
-          <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-8 text-center">
-            {/* Venue Logo ve Bilgi */}
-            {venue && (
-              <div className="mb-6 pb-6 border-b border-gray-700">
-                {venue.logo_url && (
-                  <img 
-                    src={venue.logo_url} 
-                    alt={venue.name} 
-                    className="h-16 mx-auto mb-3 object-contain"
-                  />
-                )}
-                <h2 className="text-2xl font-bold text-white mb-1">{venue.name}</h2>
-                {venue.welcome_message && (
-                  <p className="text-gray-300 text-sm">{venue.welcome_message}</p>
-                )}
-              </div>
-            )}
-            
-            {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-4xl font-bold text-white mb-2">101 Oyunu</h1>
-              <p className="text-gray-300">Dijital skor takip uygulaması</p>
-            </div>
+      <div className="min-h-screen bg-[#0f0f14] px-4 pt-6 pb-10">
+        <div className="max-w-sm mx-auto">
+          <button
+            onClick={() => setGameMode(null)}
+            className="flex items-center gap-1.5 text-white/35 text-sm mb-8 hover:text-white/55 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Geri
+          </button>
 
-            {/* Devam Eden Oyun Varsa */}
-            {hasOngoingGame && (
-              <div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-700 rounded-xl">
-                <p className="text-yellow-300 text-sm mb-3">
-                  📌 Devam eden oyununuz var
-                </p>
-                <button
-                  onClick={handleReturnToGame}
-                  className="w-full bg-yellow-600 hover:bg-yellow-500 text-white py-3 px-6 rounded-xl font-semibold transition-colors shadow-lg hover:shadow-xl"
-                >
-                  🎮 Oyuna Devam Et
-                </button>
-              </div>
-            )}
-
-            {/* Ana Seçenekler */}
-            <div className="space-y-4">
-              <button
-                onClick={() => setGameMode('single')}
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white py-4 px-6 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl"
-              >
-                🎯 Misafir Olarak Oyna
-              </button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-600"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-gray-800 text-gray-400">veya</span>
-                </div>
-              </div>
-              
-              <Link
-                href="/login"
-                className="w-full bg-green-600 hover:bg-green-500 text-white py-3 px-6 rounded-xl font-semibold transition-colors shadow-lg hover:shadow-xl block"
-              >
-                🔐 Giriş Yap
-              </Link>
-              
-              <Link
-                href="/register"
-                className="w-full bg-gray-600 hover:bg-gray-500 text-white py-3 px-6 rounded-xl font-semibold transition-colors shadow-lg hover:shadow-xl block"
-              >
-                📝 Kayıt Ol
-              </Link>
-            </div>
-
-            {/* Info */}
-            <div className="mt-6 p-4 bg-blue-900/30 border border-blue-700 rounded-xl">
-              <p className="text-blue-300 text-sm">
-                💡 Hesap oluşturarak oyun geçmişinizi kaydedebilir ve istatistiklerinizi takip edebilirsiniz
-              </p>
-            </div>
+          <div className="mb-7">
+            <h2 className="text-2xl font-bold text-white">Oyuncular</h2>
+            <p className="text-white/35 text-sm mt-1">İlk dağıtacak oyuncuyu seç</p>
           </div>
+
+          <div className="space-y-2.5 mb-8">
+            {playerList.map(({ value, setter }, idx) => (
+              <div key={idx} className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="dealer"
+                  checked={dealerIndex === idx}
+                  onChange={() => setDealerIndex(idx)}
+                  className="w-4 h-4 accent-emerald-500 flex-shrink-0"
+                />
+                <input
+                  type="text"
+                  placeholder={`Oyuncu ${idx + 1}`}
+                  value={value}
+                  onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setter(e.target.value); }}
+                  maxLength={20}
+                  className={`${inputBase} border-white/[0.08]`}
+                />
+              </div>
+            ))}
+          </div>
+
+          {hasOngoingGame && (
+            <button
+              onClick={handleReturnToGame}
+              className="w-full mb-3 py-3.5 border border-amber-500/25 bg-amber-500/10 text-amber-400 rounded-2xl font-semibold text-sm active:scale-[0.98] transition-all"
+            >
+              Devam Eden Oyuna Dön
+            </button>
+          )}
+
+          <button
+            onClick={handleStartGame}
+            disabled={!canStartGame()}
+            className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98] ${
+              canStartGame()
+                ? 'bg-emerald-500 text-black shadow-glow-green hover:bg-emerald-400'
+                : 'bg-white/[0.04] text-white/20 cursor-not-allowed border border-white/[0.06]'
+            }`}
+          >
+            Oyunu Başlat
+          </button>
         </div>
       </div>
     );
   }
 
-  const bgStyle = venue 
-    ? { background: `linear-gradient(to bottom right, ${venue.primary_color}, ${venue.secondary_color})` }
-    : {};
-  
-  return (
-    <div 
-      className="min-h-screen flex items-center justify-center p-4"
-      style={venue ? bgStyle : { background: 'linear-gradient(to bottom right, rgb(17, 24, 39), rgb(0, 0, 0))' }}
-    >
-      <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-8 w-full max-w-lg">
-        {/* Kullanıcı Bilgisi ve Çıkış */}
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <p className="text-sm text-gray-400">Hoş geldiniz</p>
-            <p className="text-white font-medium">{user.email}</p>
-          </div>
-          <div className="flex gap-2">
-            <Link
-              href="/history"
-              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors text-sm"
-            >
-              📊 Geçmiş
-            </Link>
-            <button
-              onClick={signOut}
-              className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors text-sm"
-            >
-              Çıkış
-            </button>
-          </div>
-        </div>
+  /* ─── Misafir: hoş geldin ekranı ─── */
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center p-5">
+        <div className="w-full max-w-sm">
+          {venue && (
+            <div className="mb-8 text-center">
+              {venue.logo_url && (
+                <img src={venue.logo_url} alt={venue.name} className="h-12 mx-auto mb-2 object-contain" />
+              )}
+              <p className="text-white/45 text-sm font-medium">{venue.name}</p>
+              {venue.welcome_message && (
+                <p className="text-white/25 text-xs mt-1">{venue.welcome_message}</p>
+              )}
+            </div>
+          )}
 
-        {/* Venue Logo ve Bilgi */}
-        {venue && (
-          <div className="text-center mb-6 pb-6 border-b border-gray-700">
-            {venue.logo_url && (
-              <img 
-                src={venue.logo_url} 
-                alt={venue.name} 
-                className="h-16 mx-auto mb-3 object-contain"
-              />
-            )}
-            <h2 className="text-2xl font-bold text-white mb-1">{venue.name}</h2>
-            {venue.welcome_message && (
-              <p className="text-gray-300 text-sm">{venue.welcome_message}</p>
-            )}
+          <div className="text-center mb-10">
+            <h1 className="text-7xl font-black text-white tracking-tight leading-none">101</h1>
+            <p className="text-white/25 text-xs mt-3 tracking-[0.25em] uppercase">Skor Takip</p>
           </div>
-        )}
 
-        {/* Başlık */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">101 Oyunu</h1>
-          <p className="text-gray-300">Dijital skor takibi</p>
-        </div>
+          {hasOngoingGame && (
+            <div className="mb-5 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+              <p className="text-amber-400/70 text-xs font-semibold uppercase tracking-wider mb-3">
+                Devam eden oyun
+              </p>
+              <button
+                onClick={handleReturnToGame}
+                className="w-full bg-amber-500 text-black py-3 rounded-xl font-bold text-sm active:scale-[0.98] transition-transform"
+              >
+                Kaldığım Yerden Devam Et
+              </button>
+            </div>
+          )}
 
-        {/* Oyun Modu Seçimi */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-200 mb-4">Oyun Modu Seçin</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() => setGameMode('group')}
-              className={`p-4 rounded-xl border-2 transition-all duration-200 ${
-                gameMode === 'group'
-                  ? 'border-blue-400 bg-blue-900/50 text-blue-300 shadow-lg'
-                  : 'border-gray-600 hover:border-gray-500 text-gray-300 hover:bg-gray-700/50'
-              }`}
-            >
-              <div className="font-semibold mb-1">👥 Grup</div>
-              <div className="text-sm opacity-75">2 Takım</div>
-            </button>
+          <div className="space-y-3">
             <button
               onClick={() => setGameMode('single')}
-              className={`p-4 rounded-xl border-2 transition-all duration-200 ${
-                gameMode === 'single'
-                  ? 'border-blue-400 bg-blue-900/50 text-blue-300 shadow-lg'
-                  : 'border-gray-600 hover:border-gray-500 text-gray-300 hover:bg-gray-700/50'
-              }`}
+              className="w-full bg-emerald-500 text-black py-4 rounded-2xl font-bold text-base shadow-glow-green hover:bg-emerald-400 active:scale-[0.98] transition-all duration-150"
             >
-              <div className="font-semibold mb-1">🎯 Tekli</div>
-              <div className="text-sm opacity-75">4 Kişi</div>
+              Misafir Olarak Oyna
             </button>
-          </div>
-        </div>
 
-        {/* Grup İsimleri (Grup modunda) */}
-        {gameMode === 'group' && (
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold text-gray-200 mb-4">Takım İsimleri</h3>
-            <div className="space-y-4">
-              <div>
-                <input
-                  type="text"
-                  placeholder="1. Takım Adı"
-                  value={group1Name}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    // Sadece harfler, sayılar, nokta ve virgüle izin ver
-                    if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                      setGroup1Name(value);
-                    }
-                  }}
-                  maxLength={20}
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
-                />
-                <div className="flex justify-between items-center mt-1">
-                  <div className="text-xs text-gray-500">Maksimum 20 karakter (sadece harf, sayı, nokta, virgül)</div>
-                  <div className={`text-xs ${group1Name.length > 17 ? 'text-orange-400' : 'text-gray-500'}`}>
-                    {group1Name.length}/20
-                  </div>
-                </div>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  placeholder="2. Takım Adı"
-                  value={group2Name}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    // Sadece harfler, sayılar, nokta ve virgüle izin ver
-                    if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                      setGroup2Name(value);
-                    }
-                  }}
-                  maxLength={20}
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
-                />
-                <div className="flex justify-between items-center mt-1">
-                  <div className="text-xs text-gray-500">Maksimum 20 karakter (sadece harf, sayı, nokta, virgül)</div>
-                  <div className={`text-xs ${group2Name.length > 17 ? 'text-orange-400' : 'text-gray-500'}`}>
-                    {group2Name.length}/20
-                  </div>
-                </div>
-              </div>
+            <div className="flex items-center gap-3 py-1">
+              <div className="h-px flex-1 bg-white/[0.06]" />
+              <span className="text-white/20 text-xs">veya</span>
+              <div className="h-px flex-1 bg-white/[0.06]" />
             </div>
-          </div>
-        )}
 
-        {/* Oyuncu İsimleri */}
-        {gameMode && (
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold text-gray-200 mb-4">
-              Oyuncu İsimleri <span className="text-xs text-gray-400">(Dealer seçin)</span>
-            </h3>
-            <div className="space-y-4">
-              {gameMode === 'group' ? (
-                <>
-                  <div className="grid grid-cols-1 gap-4">
-                    {[
-                      { player: player1, setPlayer: setPlayer1, team: 'team1', teamName: group1Name, position: 1 },
-                      { player: player2, setPlayer: setPlayer2, team: 'team2', teamName: group2Name, position: 2 },
-                      { player: player3, setPlayer: setPlayer3, team: 'team1', teamName: group1Name, position: 3 },
-                      { player: player4, setPlayer: setPlayer4, team: 'team2', teamName: group2Name, position: 4 }
-                    ].map(({ player, setPlayer, team, teamName, position }, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="dealer"
-                          checked={dealerIndex === idx}
-                          onChange={() => setDealerIndex(idx)}
-                          className="accent-green-500 w-4 h-4"
-                          title="Dağıtan"
-                        />
-                        <div className="flex-1">
-                          <div className={`text-xs font-medium mb-1 ${teamColors[team as keyof typeof teamColors].name}`}>
-                            {teamName || `${team === 'team1' ? '1.' : '2.'} Takım`}
-                          </div>
-                          <input
-                            type="text"
-                            placeholder={`Oyuncu ${position}`}
-                            value={player}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                                setPlayer(value);
-                              }
-                            }}
-                            maxLength={20}
-                            className={`w-full px-4 py-3 bg-gray-700 border-2 rounded-xl focus:ring-2 outline-none transition-colors text-white placeholder-gray-400 text-base ${teamColors[team as keyof typeof teamColors].border} ${teamColors[team as keyof typeof teamColors].focus}`}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 gap-4">
-                    {[player1, player2, player3, player4].map((player, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="dealer"
-                          checked={dealerIndex === idx}
-                          onChange={() => setDealerIndex(idx)}
-                          className="accent-green-500 w-4 h-4"
-                          title="Dağıtan"
-                        />
-                        <input
-                          type="text"
-                          placeholder={`Oyuncu ${idx + 1}`}
-                          value={eval(`player${idx + 1}`)}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (/^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/.test(value)) {
-                              eval(`setPlayer${idx + 1}`)(value);
-                            }
-                          }}
-                          maxLength={20}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-white placeholder-gray-400 text-base"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </>
+            <Link
+              href="/login"
+              className="block w-full py-3.5 bg-white/[0.05] border border-white/[0.08] text-white/70 rounded-2xl font-semibold text-sm text-center hover:bg-white/[0.08] active:scale-[0.98] transition-all"
+            >
+              Giriş Yap
+            </Link>
+            <Link
+              href="/register"
+              className="block w-full py-3 border border-white/[0.06] text-white/35 rounded-2xl font-medium text-sm text-center hover:border-white/[0.1] hover:text-white/55 active:scale-[0.98] transition-all"
+            >
+              Hesap Oluştur
+            </Link>
+          </div>
+
+          <p className="text-center text-white/18 text-xs mt-8 leading-relaxed">
+            Hesap oluşturarak geçmişi ve istatistikleri takip edebilirsin
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ─── Giriş yapılmış kullanıcı ekranı ─── */
+  return (
+    <div className="min-h-screen bg-[#0f0f14]">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-[#0f0f14]/90 backdrop-blur-md border-b border-white/[0.05] px-4 py-3 flex items-center justify-between">
+        <div className="min-w-0">
+          <p className="text-white/30 text-xs">Hoş geldiniz</p>
+          <p className="text-white/75 text-sm font-medium truncate max-w-[180px]">{user.email}</p>
+        </div>
+        <button
+          onClick={signOut}
+          className="text-white/35 text-xs px-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-lg"
+        >
+          Çıkış
+        </button>
+      </div>
+
+      <div className="px-4 pb-10 max-w-sm mx-auto">
+        {venue && (
+          <div className="mt-4 p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl flex items-center gap-3">
+            {venue.logo_url && (
+              <img src={venue.logo_url} alt={venue.name} className="h-8 w-8 object-contain rounded-lg" />
+            )}
+            <div className="min-w-0">
+              <p className="text-white/75 font-medium text-sm">{venue.name}</p>
+              {venue.welcome_message && (
+                <p className="text-white/30 text-xs truncate">{venue.welcome_message}</p>
               )}
             </div>
           </div>
         )}
 
-        {/* Oyunu Başlat Butonu */}
-        <button
-          onClick={handleStartGame}
-          disabled={!canStartGame()}
-          className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 ${
-            canStartGame()
-              ? 'bg-green-600 hover:bg-green-500 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
-              : 'bg-gray-600 cursor-not-allowed text-gray-400'
-          }`}
-        >
-          🚀 Oyunu Başlat
-        </button>
+        <div className="mt-7 mb-6">
+          <h1 className="text-4xl font-black text-white tracking-tight">101 Oyunu</h1>
+          <p className="text-white/30 text-sm mt-1">Dijital skor takibi</p>
+        </div>
 
-        {/* Devam Eden Oyuna Dön Butonu */}
+        {/* Oyun Modu */}
+        <div className="mb-6">
+          <p className="text-white/35 text-xs font-semibold uppercase tracking-wider mb-3">Oyun Modu</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(['single', 'group'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setGameMode(mode)}
+                className={`py-4 rounded-2xl font-semibold text-sm border transition-all active:scale-[0.98] ${
+                  gameMode === mode
+                    ? mode === 'single'
+                      ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-400'
+                      : 'bg-sky-500/15 border-sky-500/35 text-sky-400'
+                    : 'bg-white/[0.03] border-white/[0.07] text-white/45 hover:bg-white/[0.06]'
+                }`}
+              >
+                <div className="text-xl mb-1">{mode === 'single' ? '🎯' : '👥'}</div>
+                {mode === 'single' ? 'Tekli' : 'Grup'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Takım İsimleri */}
+        {gameMode === 'group' && (
+          <div className="mb-6 space-y-2">
+            <p className="text-white/35 text-xs font-semibold uppercase tracking-wider">Takım İsimleri</p>
+            <input
+              type="text"
+              placeholder="1. Takım"
+              value={group1Name}
+              onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setGroup1Name(e.target.value); }}
+              maxLength={20}
+              className={`${inputBase} border-sky-500/20`}
+            />
+            <input
+              type="text"
+              placeholder="2. Takım"
+              value={group2Name}
+              onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setGroup2Name(e.target.value); }}
+              maxLength={20}
+              className={`${inputBase} border-violet-500/20`}
+            />
+          </div>
+        )}
+
+        {/* Oyuncular */}
+        {gameMode && (
+          <div className="mb-7">
+            <p className="text-white/35 text-xs font-semibold uppercase tracking-wider mb-3">
+              Oyuncular{' '}
+              <span className="text-white/20 normal-case font-normal">— ilk dağıtacağı seç</span>
+            </p>
+            <div className="space-y-2">
+              {gameMode === 'group'
+                ? groupPlayerList.map(({ value, setter, team, teamLabel, pos }, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="dealer"
+                        checked={dealerIndex === idx}
+                        onChange={() => setDealerIndex(idx)}
+                        className="w-4 h-4 accent-emerald-500 flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-[10px] font-semibold mb-1 ${
+                          team === 'sky' ? 'text-sky-500/60' : 'text-violet-500/60'
+                        }`}>
+                          {teamLabel}
+                        </div>
+                        <input
+                          type="text"
+                          placeholder={`Oyuncu ${pos}`}
+                          value={value}
+                          onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setter(e.target.value); }}
+                          maxLength={20}
+                          className={`${inputBase} ${
+                            team === 'sky' ? 'border-sky-500/20' : 'border-violet-500/20'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  ))
+                : playerList.map(({ value, setter }, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="dealer"
+                        checked={dealerIndex === idx}
+                        onChange={() => setDealerIndex(idx)}
+                        className="w-4 h-4 accent-emerald-500 flex-shrink-0"
+                      />
+                      <input
+                        type="text"
+                        placeholder={`Oyuncu ${idx + 1}`}
+                        value={value}
+                        onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setter(e.target.value); }}
+                        maxLength={20}
+                        className={`${inputBase} border-white/[0.08] flex-1`}
+                      />
+                    </div>
+                  ))}
+            </div>
+          </div>
+        )}
+
         {hasOngoingGame && (
           <button
             onClick={handleReturnToGame}
-            className="w-full mt-4 py-4 px-6 rounded-xl font-semibold text-lg bg-orange-600 hover:bg-orange-500 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+            className="w-full mb-3 py-3.5 border border-amber-500/25 bg-amber-500/[0.08] text-amber-400 rounded-2xl font-semibold text-sm active:scale-[0.98] transition-all"
           >
-            🎮 Oyuna Dön
+            Devam Eden Oyuna Dön
           </button>
         )}
 
-        {/* Oyun Kuralları İpucu */}
-        <div className="mt-8 p-4 bg-blue-900/30 border border-blue-800 rounded-xl">
-          <h4 className="font-semibold text-blue-300 mb-2">💡 Oyun Hakkında</h4>
-          <p className="text-sm text-blue-200 leading-relaxed">
+        <button
+          onClick={handleStartGame}
+          disabled={!canStartGame()}
+          className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98] ${
+            canStartGame()
+              ? 'bg-emerald-500 text-black shadow-glow-green hover:bg-emerald-400'
+              : 'bg-white/[0.04] text-white/20 cursor-not-allowed border border-white/[0.05]'
+          }`}
+        >
+          Oyunu Başlat
+        </button>
+
+        {!gameMode && (
+          <p className="text-center text-white/18 text-xs mt-6 leading-relaxed px-2">
             101 oyunu 4 kişiyle oynanır. Grup modunda karşılıklı oturan oyuncular takım olur.
-            Tekli modunda herkes kendi için oynar.
           </p>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -508,8 +450,8 @@ function HomeContent() {
 export default function Home() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
-        <div className="text-gray-300 text-xl">Yükleniyor...</div>
+      <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center">
+        <div className="text-white/30 text-sm">Yükleniyor...</div>
       </div>
     }>
       <HomeContent />
