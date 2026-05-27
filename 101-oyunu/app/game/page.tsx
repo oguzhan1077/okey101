@@ -735,55 +735,80 @@ function GamePageContent() {
         <div className={modalBase}>
           <div className={`${modalCard} max-w-lg`}>
             <div className="p-6">
-              <div className="text-center mb-5">
-                <div className="flex justify-center mb-2">
-                  {gameEndData.winnerType === 'tie'
-                    ? <EqualIcon className="w-10 h-10 text-ablue" />
-                    : <TrophyIcon className="w-10 h-10 text-ayellow" />}
-                </div>
-                <h2 className="text-l1 font-bold text-lg">{gameEndData.winnerType === 'tie' ? 'Berabere!' : 'Oyun Bitti!'}</h2>
-              </div>
 
-              <div className="bg-[var(--warn-bg)] border border-[var(--warn-border)] rounded-xl px-4 py-3 text-center mb-4">
-                <div className="text-ayellow/90 text-xs mb-1">{gameEndData.winnerType === 'tie' ? 'Sonuç' : 'Kazanan'}</div>
-                <div className="text-ayellow font-bold text-lg">{gameEndData.winner}</div>
+              {/* Hero */}
+              <div className="text-center pb-6">
+                <div className="flex justify-center mb-3">
+                  {gameEndData.winnerType === 'tie'
+                    ? <EqualIcon className="w-12 h-12 text-ablue" />
+                    : <TrophyIcon className="w-12 h-12 text-ablue" />}
+                </div>
+                <p className="text-[10px] text-l3 uppercase tracking-widest mb-2">
+                  {gameEndData.winnerType === 'tie' ? 'Berabere' : 'Kazanan'}
+                </p>
+                <h2 className="text-2xl font-bold text-l1">{gameEndData.winner}</h2>
                 {gameEndData.winnerType === 'single' && gameEndData.winnerScore !== undefined && (
-                  <div className="text-ayellow/80 text-xs mt-0.5">{gameEndData.winnerScore} puan</div>
+                  <p className="text-l3 text-sm mt-1">{gameEndData.winnerScore} puan</p>
                 )}
               </div>
 
+              {/* Grup skorları */}
               {gameEndData.isGroup && (
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  <div className={`rounded-xl px-3 py-2.5 text-center border ${gameEndData.winnerType === 'group1' ? 'bg-[var(--success-bg)] border-[var(--success-border)]' : 'bg-s2 border-sep'}`}>
-                    <div className="text-l3 text-xs truncate">{gameEndData.groupScores.group1.name}</div>
-                    <div className="text-l1 font-bold text-xl">{gameEndData.groupScores.group1.total}</div>
+                <div className="grid grid-cols-2 gap-2 mb-6">
+                  <div className={`text-center px-4 py-3 rounded-2xl bg-s2 ${gameEndData.winnerType === 'group1' ? 'border-2 border-ablue' : 'border border-sep'}`}>
+                    <p className="text-[11px] font-semibold text-l2 uppercase tracking-widest mb-1 truncate">{gameEndData.groupScores.group1.name}</p>
+                    <p className="text-2xl font-bold text-l1">
+                      {gameEndData.groupScores.group1.total}
+                    </p>
                   </div>
-                  <div className={`rounded-xl px-3 py-2.5 text-center border ${gameEndData.winnerType === 'group2' ? 'bg-[var(--success-bg)] border-[var(--success-border)]' : 'bg-s2 border-sep'}`}>
-                    <div className="text-l3 text-xs truncate">{gameEndData.groupScores.group2.name}</div>
-                    <div className="text-l1 font-bold text-xl">{gameEndData.groupScores.group2.total}</div>
+                  <div className={`text-center px-4 py-3 rounded-2xl bg-s2 ${gameEndData.winnerType === 'group2' ? 'border-2 border-ablue' : 'border border-sep'}`}>
+                    <p className="text-[11px] font-semibold text-l2 uppercase tracking-widest mb-1 truncate">{gameEndData.groupScores.group2.name}</p>
+                    <p className="text-2xl font-bold text-l1">
+                      {gameEndData.groupScores.group2.total}
+                    </p>
                   </div>
                 </div>
               )}
 
-              <div className="rounded-xl overflow-hidden border border-sep mb-4">
-                <div className={`grid gap-1 px-3 py-2 bg-s2 text-[10px] text-l3 text-center ${gameEndData.isGroup ? 'grid-cols-6' : 'grid-cols-5'}`}>
-                  <div>Oyuncu</div><div>Puan</div><div>Okey</div><div>Bitti</div><div>B.Ceza</div>
-                  {gameEndData.isGroup && <div>T.Ceza</div>}
-                </div>
-                {(gameEndData.playersWithStats || gameEndData.rankings)?.map((player: any, index: number) => (
-                  <div key={index} className={`grid gap-1 px-3 py-2.5 border-t border-sep text-xs text-center ${gameEndData.isGroup ? 'grid-cols-6' : 'grid-cols-5'} ${index === 0 ? 'bg-[var(--warn-bg)]' : ''}`}>
-                    <div className="font-medium text-center break-words leading-tight text-l2">
-                      <span className={index === 0 ? 'text-ayellow' : ''}>{index + 1}.</span> {player.name}
+              {/* Oyuncu tablosu — transposed */}
+              {(() => {
+                const allPlayers = gameEndData.playersWithStats || gameEndData.rankings || [];
+                const cols = `3rem repeat(${allPlayers.length}, 1fr)`;
+                const rows = [
+                  { label: 'Puan',  get: (p: any) => p.score,                                                            color: (v: number) => v < 0 ? 'text-agreen' : 'text-l1' },
+                  { label: 'Okey',  get: (p: any) => p.stats?.totalOkey || 0,                                            color: (v: number) => v > 0 ? 'text-l1' : 'text-l4' },
+                  { label: 'Bitiş', get: (p: any) => (p.stats?.totalFinish || 0) + (p.stats?.totalHandFinish || 0),      color: (v: number) => v > 0 ? 'text-agreen' : 'text-l4' },
+                  { label: 'Ceza',  get: (p: any) => p.stats?.totalIndividualPenalty || 0,                               color: (v: number) => v > 0 ? 'text-l1' : 'text-l4' },
+                ];
+                return (
+                  <div className="rounded-2xl overflow-hidden border border-sep mb-5">
+                    {/* Başlık: oyuncu isimleri */}
+                    <div className="grid bg-s2 px-4 py-2 gap-1" style={{gridTemplateColumns: cols}}>
+                      <div />
+                      {allPlayers.map((p: any, i: number) => (
+                        <div key={i} className="text-center">
+                          <div className="text-[11px] font-semibold text-l3 mb-0.5">{i + 1}.</div>
+                          <div className="text-[10px] font-semibold text-l2 truncate">{p.name}</div>
+                        </div>
+                      ))}
                     </div>
-                    <div className={`self-center ${player.score < 0 ? 'text-agreen' : 'text-l1'}`}>{player.score}</div>
-                    <div className={`self-center ${(player.stats?.totalOkey || 0) > 0 ? 'text-aorange' : 'text-l4'}`}>{player.stats?.totalOkey || 0}</div>
-                    <div className={`self-center ${((player.stats?.totalFinish || 0) + (player.stats?.totalHandFinish || 0)) > 0 ? 'text-agreen' : 'text-l4'}`}>{(player.stats?.totalFinish || 0) + (player.stats?.totalHandFinish || 0)}</div>
-                    <div className={`self-center ${(player.stats?.totalIndividualPenalty || 0) > 0 ? 'text-aorange' : 'text-l4'}`}>{player.stats?.totalIndividualPenalty || 0}</div>
-                    {gameEndData.isGroup && <div className="self-center text-l1">{player.stats?.totalTeamPenalty || 0}</div>}
+                    {/* Stat satırları */}
+                    {rows.map((row, ri) => (
+                      <div key={ri} className="grid border-t border-sep px-4 py-3 gap-1 items-center" style={{gridTemplateColumns: cols}}>
+                        <div className="text-[10px] text-l3 uppercase tracking-wide">{row.label}</div>
+                        {allPlayers.map((p: any, i: number) => {
+                          const val = row.get(p, i);
+                          return (
+                            <div key={i} className={`text-sm font-semibold text-center ${row.color(val)}`}>{val}</div>
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
 
+              {/* Butonlar */}
               <div className="space-y-2">
                 <button
                   onClick={() => { setShowGameEndModal(false); startNewGame(); }}
