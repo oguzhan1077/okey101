@@ -117,32 +117,31 @@ function RoundPageContent() {
 
   const toggleFinished = (playerIndex: number) => {
     setPlayerScores(prev => {
+      const wasFinished = prev[playerIndex].finished;
+      const newFinished = !wasFinished;
+
       const newScores = prev.map((score, index) => {
         if (index === playerIndex) {
-          const newFinished = !score.finished;
-          if (gameData?.gameMode === 'group' && newFinished) {
-            const ti = getTeammateIndex(playerIndex);
-            if (ti !== -1) {
-              const newInputValues = [...inputValues];
-              newInputValues[ti] = '';
-              setInputValues(newInputValues);
-            }
-          }
-          return { ...score, finished: newFinished, handFinished: false };
-        } else if (prev[playerIndex].finished !== true) {
+          return { ...score, finished: newFinished, handFinished: false, points: newFinished ? 0 : score.points };
+        } else if (!wasFinished) {
           return { ...score, finished: false, handFinished: false };
         }
         return score;
       });
-      if (gameData?.gameMode === 'group' && !prev[playerIndex].finished) {
-        const ti = getTeammateIndex(playerIndex);
-        if (ti !== -1) {
-          newScores[ti] = { ...newScores[ti], points: 0 };
-          const newInputValues = [...inputValues];
-          newInputValues[ti] = '';
-          setInputValues(newInputValues);
+
+      const newInputValues = [...inputValues];
+      if (newFinished) {
+        newInputValues[playerIndex] = '';
+        if (gameData?.gameMode === 'group') {
+          const ti = getTeammateIndex(playerIndex);
+          if (ti !== -1) {
+            newScores[ti] = { ...newScores[ti], points: 0 };
+            newInputValues[ti] = '';
+          }
         }
       }
+      setInputValues(newInputValues);
+
       return newScores;
     });
   };
@@ -186,6 +185,7 @@ function RoundPageContent() {
   };
 
   const isPointInputDisabled = useCallback((playerIndex: number) => {
+    if (playerScores[playerIndex]?.finished) return true;
     if (!gameData || gameData.gameMode !== 'group') return false;
     const ti = getTeammateIndex(playerIndex);
     return ti !== -1 ? playerScores[ti]?.finished || false : false;
@@ -350,7 +350,7 @@ function RoundPageContent() {
                       disabled={playerScores[pi]?.individualPenalty === 0}
                       className="w-7 h-7 rounded-full bg-s2 border border-sep text-l2 flex items-center justify-center text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-[0.93] touch-manipulation"
                     >−</button>
-                    <div className={`font-semibold text-xs min-w-[22px] text-center ${playerScores[pi]?.individualPenalty ? 'text-l1' : 'text-l3'}`}>
+                    <div className={`text-xs min-w-[22px] text-center ${playerScores[pi]?.individualPenalty ? 'text-ablue font-bold' : 'text-l3 font-semibold'}`}>
                       {playerScores[pi]?.individualPenalty || 0}
                     </div>
                     <button
@@ -375,7 +375,7 @@ function RoundPageContent() {
                         disabled={playerScores[pi]?.teamPenalty === 0}
                         className="w-7 h-7 rounded-full bg-s2 border border-sep text-l2 flex items-center justify-center text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-[0.93] touch-manipulation"
                       >−</button>
-                      <div className={`font-semibold text-xs min-w-[22px] text-center ${playerScores[pi]?.teamPenalty ? 'text-l1' : 'text-l3'}`}>
+                      <div className={`text-xs min-w-[22px] text-center ${playerScores[pi]?.teamPenalty ? 'text-ablue font-bold' : 'text-l3 font-semibold'}`}>
                         {playerScores[pi]?.teamPenalty || 0}
                       </div>
                       <button

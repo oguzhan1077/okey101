@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { ChartIcon, FlagIcon, RefreshIcon, TrophyIcon, EqualIcon, CheckCircleIcon } from '@/components/Icons';
+import { Logo } from '@/components/Logo';
 
 export const dynamic = 'force-dynamic';
 
@@ -274,17 +275,20 @@ function GamePageContent() {
       isGroup1: gameData?.gameMode === 'group' && (index === 0 || index === 2),
       isGroup2: gameData?.gameMode === 'group' && (index === 1 || index === 3)
     }));
-    let endData: any = { isGroup: !!groupScores, playersWithStats: playersWithStats.sort((a, b) => a.score - b.score) };
+    const sortedPlayers = playersWithStats.sort((a, b) => a.score - b.score);
+    let endData: any = { isGroup: !!groupScores, playersWithStats: sortedPlayers };
     if (groupScores) {
       endData.groupScores = groupScores;
       if (groupScores.group1.total < groupScores.group2.total) { endData.winner = groupScores.group1.name; endData.winnerType = 'group1'; }
       else if (groupScores.group2.total < groupScores.group1.total) { endData.winner = groupScores.group2.name; endData.winnerType = 'group2'; }
       else { endData.winner = 'Berabere'; endData.winnerType = 'tie'; }
+      endData.scoreFark = Math.abs(groupScores.group1.total - groupScores.group2.total);
     } else {
-      endData.rankings = playersWithStats.map((player, index) => ({ ...player, rank: index + 1 }));
-      endData.winner = playersWithStats[0].name;
+      endData.rankings = sortedPlayers.map((player, index) => ({ ...player, rank: index + 1 }));
+      endData.winner = sortedPlayers[0].name;
       endData.winnerType = 'single';
-      endData.winnerScore = playersWithStats[0].score;
+      endData.winnerScore = sortedPlayers[0].score;
+      endData.scoreFark = sortedPlayers.length > 1 ? Math.abs(sortedPlayers[0].score - sortedPlayers[1].score) : 0;
     }
     try {
       const gameId = localStorage.getItem('currentGameId');
@@ -389,7 +393,7 @@ function GamePageContent() {
       {/* Sticky Header */}
       <div className="sticky top-0 z-10 bg-s0h backdrop-blur-md border-b border-sep">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-base font-bold text-l1">101 Oyunu</h1>
+          <Logo size="sm" />
           <ThemeToggle />
         </div>
       </div>
@@ -458,7 +462,7 @@ function GamePageContent() {
               <div className="mt-2 grid grid-cols-2 divide-x divide-sep bg-s2 rounded-xl overflow-hidden">
                 <div className="px-4 py-3">
                   <div className="text-[10px] text-l3 uppercase tracking-widest mb-1">Önde</div>
-                  <div className="text-ablue font-semibold text-sm truncate">{diff.leader}</div>
+                  <div className="text-ablue font-bold text-sm truncate">{diff.leader}</div>
                 </div>
                 <div className="px-4 py-3">
                   <div className="text-[10px] text-l3 uppercase tracking-widest mb-1">Fark</div>
@@ -749,6 +753,13 @@ function GamePageContent() {
                 <h2 className="text-2xl font-bold text-l1">{gameEndData.winner}</h2>
                 {gameEndData.winnerType === 'single' && gameEndData.winnerScore !== undefined && (
                   <p className="text-l3 text-sm mt-1">{gameEndData.winnerScore} puan</p>
+                )}
+                {gameEndData.winnerType !== 'tie' && gameEndData.scoreFark !== undefined && (
+                  <p className="text-xs mt-2 text-l4">
+                    <span className="uppercase tracking-widest">Fark</span>{' '}
+                    <span className="text-l2 font-semibold">{gameEndData.scoreFark}</span>{' '}
+                    <span>puan</span>
+                  </p>
                 )}
               </div>
 

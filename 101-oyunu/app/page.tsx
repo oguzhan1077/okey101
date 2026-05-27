@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { PersonIcon, PeopleIcon } from '@/components/Icons';
+import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -200,8 +201,10 @@ function HomeContent() {
           </div>
 
           <div className="text-center mb-10">
-            <h1 className="text-7xl font-black text-l1 tracking-tight leading-none">101</h1>
-            <p className="text-l4 text-xs mt-3 tracking-[0.25em] uppercase">Skor Takip</p>
+            <div className="flex justify-center mb-4">
+              <Logo size="lg" />
+            </div>
+            <p className="text-l4 text-xs mt-1 tracking-[0.25em] uppercase">Skor Takip</p>
           </div>
 
           {hasOngoingGame && (
@@ -276,8 +279,13 @@ function HomeContent() {
 
       <div className="px-4 pb-10 max-w-sm mx-auto">
         <div className="mt-7 mb-6">
-          <h1 className="text-4xl font-black text-l1 tracking-tight">101 Oyunu</h1>
-          <p className="text-l3 text-sm mt-1">Dijital skor takibi</p>
+          <div className="flex items-center gap-3">
+            <Logo size="md" />
+            <div>
+              <h1 className="text-2xl font-black text-l1 tracking-tight leading-none">101 Oyunu</h1>
+              <p className="text-l3 text-xs mt-0.5">Dijital skor takibi</p>
+            </div>
+          </div>
         </div>
 
         {/* Oyun Modu */}
