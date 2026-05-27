@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { PersonIcon, PeopleIcon } from '@/components/Icons';
+import { PersonIcon, PeopleIcon, LogoutIcon } from '@/components/Icons';
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 
@@ -27,7 +27,8 @@ function HomeContent() {
   const [player4, setPlayer4] = useState('');
   const [hasOngoingGame, setHasOngoingGame] = useState(false);
   const [ongoingGameData, setOngoingGameData] = useState<any>(null);
-  const [dealerIndex, setDealerIndex] = useState<number>(0);
+  const [dealerIndex, setDealerIndex] = useState<number>(0)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     try {
@@ -262,54 +263,47 @@ function HomeContent() {
     <div className="min-h-screen bg-s0">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-s0h backdrop-blur-md border-b border-sep px-4 py-3 flex items-center justify-between">
-        <div className="min-w-0">
-          <p className="text-l3 text-xs">Hoş geldiniz</p>
-          <p className="text-l2 text-sm font-medium truncate max-w-[180px]">{user.email}</p>
-        </div>
+        <Logo size="sm" />
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <button
-            onClick={signOut}
-            className="text-l3 text-xs px-3 py-1.5 bg-s2 border border-sep rounded-lg"
+            onClick={() => setShowLogoutConfirm(true)}
+            className="w-9 h-9 flex items-center justify-center bg-s2 border border-sep rounded-xl text-l3 transition-colors active:scale-[0.94] touch-manipulation"
           >
-            Çıkış
+            <LogoutIcon className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       <div className="px-4 pb-10 max-w-sm mx-auto">
         <div className="mt-7 mb-6">
-          <div className="flex items-center gap-3">
-            <Logo size="md" />
-            <div>
-              <h1 className="text-2xl font-black text-l1 tracking-tight leading-none">101 Oyunu</h1>
-              <p className="text-l3 text-xs mt-0.5">Dijital skor takibi</p>
-            </div>
-          </div>
+          <h1 className="text-4xl font-black text-l1 tracking-tight">101 Oyunu</h1>
+          <p className="text-l3 text-sm mt-1">Dijital skor takibi</p>
         </div>
 
         {/* Oyun Modu */}
         <div className="mb-6">
           <p className="text-l3 text-xs font-semibold uppercase tracking-wider mb-3">Oyun Modu</p>
           <div className="grid grid-cols-2 gap-2">
-            {(['single', 'group'] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setGameMode(mode)}
-                className={`py-4 rounded-2xl font-semibold text-sm border transition-all active:scale-[0.98] ${
-                  gameMode === mode
-                    ? mode === 'single'
-                      ? 'bg-[var(--success-bg)] border-[var(--success-border)] text-agreen'
-                      : 'bg-[var(--team1-bg)] border-[var(--team1-border)] text-ablue'
-                    : 'bg-s2 border-sep text-l3 hover:text-l2'
-                }`}
-              >
-                <div className="flex justify-center mb-1.5">
-                  {mode === 'single' ? <PersonIcon /> : <PeopleIcon />}
-                </div>
-                {mode === 'single' ? 'Tekli' : 'Grup'}
-              </button>
-            ))}
+            {(['single', 'group'] as const).map((mode) => {
+              const isSelected = gameMode === mode;
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setGameMode(mode)}
+                  className={`py-4 rounded-2xl font-semibold text-sm border transition-all active:scale-[0.98] ${
+                    isSelected
+                      ? 'bg-[var(--team1-bg)] border-[var(--team1-border)] text-ablue'
+                      : 'bg-s2 border-sep text-l3 hover:text-l2'
+                  }`}
+                >
+                  <div className={`flex justify-center mb-1.5 ${!isSelected ? 'text-ablue' : ''}`}>
+                    {mode === 'single' ? <PersonIcon /> : <PeopleIcon />}
+                  </div>
+                  {mode === 'single' ? 'Tekli' : 'Grup'}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -423,6 +417,35 @@ function HomeContent() {
           </p>
         )}
       </div>
+
+      {/* Logout Confirm Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 z-50">
+          <div className="bg-s1 border border-sep rounded-2xl w-full max-w-sm">
+            <div className="p-6 text-center">
+              <div className="flex justify-center mb-3">
+                <LogoutIcon className="w-10 h-10 text-l3" />
+              </div>
+              <h2 className="text-l1 font-bold text-lg mb-2">Çıkış Yap</h2>
+              <p className="text-l3 text-sm mb-6 leading-relaxed">Hesabınızdan çıkmak istediğinizden emin misiniz?</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="bg-s2 border border-sep text-l2 py-3 rounded-xl font-medium text-sm active:scale-[0.97] touch-manipulation"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={() => { setShowLogoutConfirm(false); signOut(); }}
+                  className="bg-s2 border border-[var(--danger-border)] text-ared py-3 rounded-xl font-bold text-sm active:scale-[0.97] touch-manipulation"
+                >
+                  Çıkış Yap
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

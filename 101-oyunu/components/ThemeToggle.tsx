@@ -7,7 +7,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="w-9 h-9 rounded-xl bg-s2 border border-sep text-l2 flex items-center justify-center transition-colors active:scale-[0.94] touch-manipulation"
+      className="w-9 h-9 rounded-xl bg-s2 border border-ablue text-ablue flex items-center justify-center transition-colors active:scale-[0.94] touch-manipulation"
       aria-label="Tema değiştir"
     >
       {theme === 'dark' ? (
