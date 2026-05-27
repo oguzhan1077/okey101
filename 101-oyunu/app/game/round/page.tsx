@@ -264,8 +264,12 @@ function RoundPageContent() {
     );
   }
 
-  const teamDotColor = (index: number) =>
-    (index === 0 || index === 2) ? 'bg-ablue' : 'bg-apurple';
+  const isGroupMode = gameData.gameMode === 'group';
+  const displayOrder = isGroupMode ? [0, 2, 1, 3] : [0, 1, 2, 3];
+  const rowGrid = isGroupMode ? 'relative grid grid-cols-4 gap-1.5' : 'grid grid-cols-4 gap-2';
+  const Sep = () => isGroupMode
+    ? <div className="absolute inset-y-0 left-1/2 w-px bg-sep -translate-x-px pointer-events-none" />
+    : null;
 
   return (
     <div className="min-h-screen bg-s0 pb-24">
@@ -290,46 +294,42 @@ function RoundPageContent() {
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
         {/* Score Entry Card */}
         <div className={`${glassCard} overflow-hidden`}>
+
+          {/* Takım başlıkları */}
+          {isGroupMode && (
+            <div className="grid grid-cols-2 px-3 pt-3 pb-1">
+              <p className="text-[10px] font-semibold text-l3 text-center uppercase tracking-widest">{gameData.group1Name}</p>
+              <p className="text-[10px] font-semibold text-l3 text-center uppercase tracking-widest">{gameData.group2Name}</p>
+            </div>
+          )}
+
           {/* Player name headers */}
-          <div className="grid grid-cols-4 gap-2 px-3 pt-3 pb-2">
-            {gameData.players.map((name, index) => (
-              <div key={index} className="rounded-lg border border-sep bg-s2 px-1 py-2 text-center">
-                <div className="flex justify-center items-center gap-1 mb-1">
-                  {gameData.gameMode === 'group' && (
-                    <span className={`w-1.5 h-1.5 rounded-full inline-block ${teamDotColor(index)}`} />
-                  )}
-                  {gameData.dealerIndex === index && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-ablue inline-block" />
-                  )}
-                </div>
-                <div className="text-[11px] font-semibold leading-tight text-l1" style={{wordBreak: 'break-word'}}>{name}</div>
-                {gameData.gameMode === 'group' && (
-                  <div className="text-[9px] mt-0.5 truncate text-l3">
-                    {(index === 0 || index === 2) ? gameData.group1Name : gameData.group2Name}
-                  </div>
-                )}
+          <div className={`${rowGrid} px-3 ${isGroupMode ? 'pt-1' : 'pt-3'} pb-2`}>
+            <Sep />
+            {displayOrder.map((pi) => (
+              <div key={pi} className={`rounded-lg px-1 py-2 text-center bg-s2 ${gameData.dealerIndex === pi ? 'border-2 border-ablue' : 'border border-sep'}`}>
+                <div className="text-[11px] font-semibold leading-tight text-l1" style={{wordBreak: 'break-word'}}>{gameData.players[pi]}</div>
               </div>
             ))}
           </div>
 
           <div className="px-3 pb-3 space-y-4">
-            {/* Points Row */}
+            {/* Puan */}
             <div>
               <div className="text-l3 text-xs font-medium mb-2">Puan</div>
-              <div className="grid grid-cols-4 gap-2">
-                {gameData.players.map((_, playerIndex) => {
-                  const isDisabled = isPointInputDisabled(playerIndex);
+              <div className={rowGrid}>
+                <Sep />
+                {displayOrder.map((pi) => {
+                  const isDisabled = isPointInputDisabled(pi);
                   return (
                     <input
-                      key={playerIndex}
+                      key={pi}
                       type="text" inputMode="decimal" pattern="^-?\d*$"
-                      value={isDisabled ? '0' : inputValues[playerIndex]}
+                      value={isDisabled ? '0' : inputValues[pi]}
                       disabled={isDisabled}
-                      onChange={(e) => { if (!isDisabled) handlePointChange(playerIndex, e.target.value); }}
+                      onChange={(e) => { if (!isDisabled) handlePointChange(pi, e.target.value); }}
                       className={`w-full px-1 py-3 border rounded-xl text-center text-sm font-semibold transition-colors ${
-                        isDisabled
-                          ? 'bg-s2 border-sep text-l4 cursor-not-allowed'
-                          : 'bg-s2 border-sep text-l1'
+                        isDisabled ? 'bg-s2 border-sep text-l4 cursor-not-allowed' : 'bg-s2 border-sep text-l1'
                       }`}
                       placeholder="0" maxLength={4}
                     />
@@ -338,22 +338,23 @@ function RoundPageContent() {
               </div>
             </div>
 
-            {/* Individual Penalty Row */}
+            {/* Bireysel Ceza */}
             <div>
               <div className="text-l3 text-xs font-medium mb-2">Bireysel Ceza</div>
-              <div className="grid grid-cols-4 gap-2">
-                {gameData.players.map((_, playerIndex) => (
-                  <div key={playerIndex} className="flex items-center justify-center gap-1">
+              <div className={rowGrid}>
+                <Sep />
+                {displayOrder.map((pi) => (
+                  <div key={pi} className="flex items-center justify-center gap-1">
                     <button
-                      onClick={() => removePenalty(playerIndex, 'individual')}
-                      disabled={playerScores[playerIndex]?.individualPenalty === 0}
+                      onClick={() => removePenalty(pi, 'individual')}
+                      disabled={playerScores[pi]?.individualPenalty === 0}
                       className="w-7 h-7 rounded-full bg-s2 border border-sep text-l2 flex items-center justify-center text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-[0.93] touch-manipulation"
                     >−</button>
-                    <div className={`font-semibold text-xs min-w-[22px] text-center ${playerScores[playerIndex]?.individualPenalty ? 'text-ared' : 'text-l3'}`}>
-                      {playerScores[playerIndex]?.individualPenalty || 0}
+                    <div className={`font-semibold text-xs min-w-[22px] text-center ${playerScores[pi]?.individualPenalty ? 'text-l1' : 'text-l3'}`}>
+                      {playerScores[pi]?.individualPenalty || 0}
                     </div>
                     <button
-                      onClick={() => addPenalty(playerIndex, 'individual')}
+                      onClick={() => addPenalty(pi, 'individual')}
                       className="w-7 h-7 rounded-full bg-s2 border border-sep text-l2 flex items-center justify-center text-sm font-bold transition-colors active:scale-[0.93] touch-manipulation"
                     >+</button>
                   </div>
@@ -361,23 +362,24 @@ function RoundPageContent() {
               </div>
             </div>
 
-            {/* Team Penalty Row */}
-            {gameData.gameMode === 'group' && (
+            {/* Takım Cezası */}
+            {isGroupMode && (
               <div>
                 <div className="text-l3 text-xs font-medium mb-2">Takım Cezası</div>
-                <div className="grid grid-cols-4 gap-2">
-                  {gameData.players.map((_, playerIndex) => (
-                    <div key={playerIndex} className="flex items-center justify-center gap-1">
+                <div className={rowGrid}>
+                  <Sep />
+                  {displayOrder.map((pi) => (
+                    <div key={pi} className="flex items-center justify-center gap-1">
                       <button
-                        onClick={() => removePenalty(playerIndex, 'team')}
-                        disabled={playerScores[playerIndex]?.teamPenalty === 0}
+                        onClick={() => removePenalty(pi, 'team')}
+                        disabled={playerScores[pi]?.teamPenalty === 0}
                         className="w-7 h-7 rounded-full bg-s2 border border-sep text-l2 flex items-center justify-center text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-[0.93] touch-manipulation"
                       >−</button>
-                      <div className={`font-semibold text-xs min-w-[22px] text-center ${playerScores[playerIndex]?.teamPenalty ? 'text-ared' : 'text-l3'}`}>
-                        {playerScores[playerIndex]?.teamPenalty || 0}
+                      <div className={`font-semibold text-xs min-w-[22px] text-center ${playerScores[pi]?.teamPenalty ? 'text-l1' : 'text-l3'}`}>
+                        {playerScores[pi]?.teamPenalty || 0}
                       </div>
                       <button
-                        onClick={() => addPenalty(playerIndex, 'team')}
+                        onClick={() => addPenalty(pi, 'team')}
                         className="w-7 h-7 rounded-full bg-s2 border border-sep text-l2 flex items-center justify-center text-sm font-bold transition-colors active:scale-[0.93] touch-manipulation"
                       >+</button>
                     </div>
@@ -386,24 +388,23 @@ function RoundPageContent() {
               </div>
             )}
 
-            {/* Okey Row */}
+            {/* Okey */}
             <div>
               <div className="text-l3 text-xs font-medium mb-2">Okey</div>
-              <div className="grid grid-cols-4 gap-2">
-                {gameData.players.map((_, playerIndex) => (
-                  <div key={playerIndex} className="flex justify-center gap-1">
+              <div className={rowGrid}>
+                <Sep />
+                {displayOrder.map((pi) => (
+                  <div key={pi} className="flex justify-center gap-1">
                     {([1, 2] as const).map(n => (
                       <button key={n}
-                        onClick={() => toggleOkey(playerIndex, n)}
+                        onClick={() => toggleOkey(pi, n)}
                         className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-[0.93] touch-manipulation ${
-                          (n === 1 ? playerScores[playerIndex]?.hasOkey1 : playerScores[playerIndex]?.hasOkey2)
+                          (n === 1 ? playerScores[pi]?.hasOkey1 : playerScores[pi]?.hasOkey2)
                             ? 'bg-aorange text-white'
                             : 'bg-s2 border border-sep text-l3'
                         }`}
                       >
-                        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor">
-                          <circle cx="6" cy="6" r="5" />
-                        </svg>
+                        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor"><circle cx="6" cy="6" r="5" /></svg>
                       </button>
                     ))}
                   </div>
@@ -411,17 +412,16 @@ function RoundPageContent() {
               </div>
             </div>
 
-            {/* Total Row */}
+            {/* Toplam */}
             <div>
               <div className="text-l3 text-xs font-medium mb-2">Toplam</div>
-              <div className="grid grid-cols-4 gap-2">
-                {gameData.players.map((_, playerIndex) => {
-                  const total = getTotal(playerIndex);
+              <div className={rowGrid}>
+                <Sep />
+                {displayOrder.map((pi) => {
+                  const total = getTotal(pi);
                   return (
-                    <div key={playerIndex} className="bg-s2 border border-sep rounded-xl py-2.5 text-center">
-                      <span className={`text-base font-bold ${total > 0 ? 'text-ared' : total < 0 ? 'text-agreen' : 'text-l3'}`}>
-                        {total}
-                      </span>
+                    <div key={pi} className="bg-s2 border border-sep rounded-xl py-2.5 text-center">
+                      <span className={`text-base font-bold ${total < 0 ? 'text-agreen' : 'text-l1'}`}>{total}</span>
                     </div>
                   );
                 })}
@@ -437,21 +437,21 @@ function RoundPageContent() {
             <p className="text-l3 text-xs mt-0.5">−101 puan · Sadece 1 oyuncu</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {gameData.players.map((playerName, playerIndex) => (
+            {displayOrder.map((pi) => (
               <button
-                key={playerIndex}
-                onClick={() => toggleFinished(playerIndex)}
+                key={pi}
+                onClick={() => toggleFinished(pi)}
                 disabled={playerScores.some(s => s.handFinished)}
                 className={`py-3.5 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-between touch-manipulation active:scale-[0.97] ${
-                  playerScores[playerIndex]?.finished && !playerScores[playerIndex]?.handFinished
+                  playerScores[pi]?.finished && !playerScores[pi]?.handFinished
                     ? 'bg-[var(--success-bg)] border-2 border-[var(--success-border)] text-agreen'
                     : playerScores.some(s => s.handFinished)
                     ? 'bg-s2 border border-sep text-l4 cursor-not-allowed'
                     : 'bg-s2 border border-sep text-l2'
                 }`}
               >
-                <span>{playerName}</span>
-                {playerScores[playerIndex]?.finished && !playerScores[playerIndex]?.handFinished
+                <span>{gameData.players[pi]}</span>
+                {playerScores[pi]?.finished && !playerScores[pi]?.handFinished
                   ? <CheckCircleIcon className="w-5 h-5" />
                   : <CircleIcon className="w-5 h-5" />}
               </button>
@@ -471,21 +471,21 @@ function RoundPageContent() {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {gameData.players.map((playerName, playerIndex) => (
+            {displayOrder.map((pi) => (
               <button
-                key={playerIndex}
-                onClick={() => toggleHandFinished(playerIndex)}
+                key={pi}
+                onClick={() => toggleHandFinished(pi)}
                 disabled={playerScores.some(s => s.finished && !s.handFinished)}
                 className={`py-3.5 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-between touch-manipulation active:scale-[0.97] ${
-                  playerScores[playerIndex]?.handFinished
+                  playerScores[pi]?.handFinished
                     ? 'bg-[var(--team1-bg)] border-2 border-[var(--team1-border)] text-ablue'
                     : playerScores.some(s => s.finished && !s.handFinished)
                     ? 'bg-s2 border border-sep text-l4 cursor-not-allowed'
                     : 'bg-s2 border border-sep text-l2'
                 }`}
               >
-                <span>{playerName}</span>
-                {playerScores[playerIndex]?.handFinished
+                <span>{gameData.players[pi]}</span>
+                {playerScores[pi]?.handFinished
                   ? <TargetIcon className="w-5 h-5" />
                   : <CircleIcon className="w-5 h-5" />}
               </button>

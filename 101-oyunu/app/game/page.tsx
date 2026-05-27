@@ -381,6 +381,9 @@ function GamePageContent() {
     );
   }
 
+  const isGroupMode = gameData.gameMode === 'group';
+  const displayOrder = isGroupMode ? [0, 2, 1, 3] : [0, 1, 2, 3];
+
   return (
     <div className="min-h-screen bg-s0">
       {/* Sticky Header */}
@@ -394,42 +397,32 @@ function GamePageContent() {
       <div className="max-w-4xl mx-auto px-4 py-4 space-y-3">
         {/* Player Cards */}
         <div className={`${glassCard} p-3`}>
-          <div className="grid grid-cols-4 gap-2">
-            {players.map((player, index) => {
-              const isGroup1 = index === 0 || index === 2;
+          {isGroupMode && (
+            <div className="grid grid-cols-2 px-1 pb-2">
+              <p className="text-[10px] font-semibold text-l3 text-center uppercase tracking-widest">{gameData.group1Name}</p>
+              <p className="text-[10px] font-semibold text-l3 text-center uppercase tracking-widest">{gameData.group2Name}</p>
+            </div>
+          )}
+          <div className={`${isGroupMode ? 'relative ' : ''}grid grid-cols-4 gap-2`}>
+            {isGroupMode && <div className="absolute inset-y-0 left-1/2 w-px bg-sep -translate-x-px pointer-events-none" />}
+            {displayOrder.map((index) => {
+              const player = players[index];
               return (
                 <div
                   key={index}
-                  className={`rounded-xl p-2.5 border text-center ${
-                    gameData.gameMode === 'group'
-                      ? isGroup1
-                        ? 'bg-[var(--team1-bg)] border-[var(--team1-border)]'
-                        : 'bg-[var(--team2-bg)] border-[var(--team2-border)]'
-                      : 'bg-s2 border-sep'
+                  className={`rounded-xl p-2.5 text-center ${
+                    gameData.dealerIndex === index
+                      ? 'border-2 border-ablue bg-s2'
+                      : 'border bg-s2 border-sep'
                   }`}
                 >
-                  {gameData.dealerIndex === index && (
-                    <div className="flex justify-center mb-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-agreen inline-block" title="Dağıtan" />
-                    </div>
-                  )}
-                  <div
-                    className={`font-semibold text-xs leading-tight ${
-                      gameData.gameMode === 'group' ? (isGroup1 ? 'text-ablue' : 'text-apurple') : 'text-l1'
-                    }`}
-                    style={{wordBreak: 'break-word'}}
-                  >
+                  <div className="font-semibold text-xs leading-tight text-l1" style={{wordBreak: 'break-word'}}>
                     {player.name}
                   </div>
-                  {gameData.gameMode === 'group' && (
-                    <div className={`text-[10px] mt-0.5 truncate ${isGroup1 ? 'text-ablue/70' : 'text-apurple/70'}`}>
-                      {isGroup1 ? gameData.group1Name : gameData.group2Name}
-                    </div>
-                  )}
                   {showCalculation && (
                     <div className="mt-2 pt-2 border-t border-sep">
                       <div className={`text-sm font-bold ${
-                        getTotalScore(index) > 0 ? 'text-ared' : getTotalScore(index) < 0 ? 'text-agreen' : 'text-l3'
+                        getTotalScore(index) < 0 ? 'text-agreen' : 'text-l1'
                       }`}>
                         {getTotalScore(index)}
                       </div>
@@ -441,17 +434,17 @@ function GamePageContent() {
           </div>
 
           {/* Group totals */}
-          {showCalculation && gameData.gameMode === 'group' && (() => {
+          {showCalculation && isGroupMode && (() => {
             const g = getGroupScores()!;
             return (
               <div className="grid grid-cols-2 gap-2 mt-3">
-                <div className="bg-[var(--team1-bg)] border border-[var(--team1-border)] rounded-xl px-3 py-2.5 text-center">
-                  <div className="text-ablue text-[11px] font-medium truncate">{g.group1.name}</div>
-                  <div className={`text-xl font-bold mt-0.5 ${g.group1.total > 0 ? 'text-ared' : 'text-agreen'}`}>{g.group1.total}</div>
+                <div className="bg-s2 border border-sep rounded-xl px-3 py-2.5 text-center">
+                  <div className="text-l3 text-[11px] font-medium truncate">{g.group1.name}</div>
+                  <div className={`text-xl font-bold mt-0.5 ${g.group1.total < 0 ? 'text-agreen' : 'text-l1'}`}>{g.group1.total}</div>
                 </div>
-                <div className="bg-[var(--team2-bg)] border border-[var(--team2-border)] rounded-xl px-3 py-2.5 text-center">
-                  <div className="text-apurple text-[11px] font-medium truncate">{g.group2.name}</div>
-                  <div className={`text-xl font-bold mt-0.5 ${g.group2.total > 0 ? 'text-ared' : 'text-agreen'}`}>{g.group2.total}</div>
+                <div className="bg-s2 border border-sep rounded-xl px-3 py-2.5 text-center">
+                  <div className="text-l3 text-[11px] font-medium truncate">{g.group2.name}</div>
+                  <div className={`text-xl font-bold mt-0.5 ${g.group2.total < 0 ? 'text-agreen' : 'text-l1'}`}>{g.group2.total}</div>
                 </div>
               </div>
             );
@@ -462,11 +455,15 @@ function GamePageContent() {
             const diff = getScoreDifferences();
             if (!diff) return null;
             return (
-              <div className="mt-2 flex items-center justify-between bg-s2 rounded-xl px-4 py-2.5 text-sm">
-                <span className="text-l3 text-xs">Önde</span>
-                <span className="text-ayellow font-semibold">{diff.leader}</span>
-                <span className="text-l3 text-xs">Fark</span>
-                <span className="text-ablue font-semibold">{diff.difference} puan</span>
+              <div className="mt-2 grid grid-cols-2 divide-x divide-sep bg-s2 rounded-xl overflow-hidden">
+                <div className="px-4 py-3">
+                  <div className="text-[10px] text-l3 uppercase tracking-widest mb-1">Önde</div>
+                  <div className="text-ablue font-semibold text-sm truncate">{diff.leader}</div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="text-[10px] text-l3 uppercase tracking-widest mb-1">Fark</div>
+                  <div className="text-l1 font-bold text-sm">{diff.difference} <span className="text-l3 font-normal text-xs">puan</span></div>
+                </div>
               </div>
             );
           })()}
@@ -487,27 +484,22 @@ function GamePageContent() {
             <div>
               <div className="grid grid-cols-6 gap-1 px-3 py-2 bg-s2">
                 <div className="text-l4 text-[10px] text-center">#</div>
-                {players.map((player, idx) => {
-                  const isGroup1 = idx === 0 || idx === 2;
-                  return (
-                    <div key={idx} className={`text-[10px] text-center font-medium truncate px-0.5 ${
-                      gameData.gameMode === 'group' ? (isGroup1 ? 'text-ablue/80' : 'text-apurple/80') : 'text-l3'
-                    }`}>
-                      {player.name}
-                    </div>
-                  );
-                })}
+                {displayOrder.map((idx, colIdx) => (
+                  <div key={idx} className={`text-[10px] text-center font-medium truncate px-0.5 text-l3 ${isGroupMode && colIdx === 2 ? 'border-l border-sep' : ''}`}>
+                    {players[idx].name}
+                  </div>
+                ))}
                 <div className="text-l4 text-[10px] text-center"></div>
               </div>
 
               {players[0].scores.map((_, roundIndex) => (
                 <div key={roundIndex} className="grid grid-cols-6 gap-1 px-3 py-2 border-t border-sep hover:bg-s2 transition-colors">
                   <div className="text-l3 text-xs text-center self-center">{roundIndex + 1}</div>
-                  {players.map((player, playerIndex) => {
-                    const score = player.scores[roundIndex];
+                  {displayOrder.map((playerIndex, colIdx) => {
+                    const score = players[playerIndex].scores[roundIndex];
                     return (
-                      <div key={playerIndex} className="text-center self-center">
-                        <span className={`text-xs font-bold ${score > 0 ? 'text-ared' : score < 0 ? 'text-agreen' : 'text-l4'}`}>
+                      <div key={playerIndex} className={`text-center self-center ${isGroupMode && colIdx === 2 ? 'border-l border-sep' : ''}`}>
+                        <span className={`text-xs font-bold ${score < 0 ? 'text-agreen' : 'text-l1'}`}>
                           {score}
                         </span>
                       </div>
@@ -607,20 +599,15 @@ function GamePageContent() {
                       <div>İsim</div><div>Puan</div><div>B.Ceza</div><div>T.Ceza</div><div>Okey</div><div>Bitti</div><div>Toplam</div>
                     </div>
                     {detail.players.map((player, index) => {
-                      const isGroup1 = index === 0 || index === 2;
                       return (
-                        <div key={index} className={`grid grid-cols-7 gap-1 px-2 py-2.5 rounded-lg text-xs text-center ${
-                          gameData?.gameMode === 'group'
-                            ? isGroup1 ? 'bg-[var(--team1-bg)]' : 'bg-[var(--team2-bg)]'
-                            : 'bg-s2'
-                        }`}>
-                          <div className={`font-medium truncate ${gameData?.gameMode === 'group' ? (isGroup1 ? 'text-ablue' : 'text-apurple') : 'text-l2'}`}>{player.name}</div>
-                          <div className={player.points > 0 ? 'text-ared' : player.points < 0 ? 'text-agreen' : 'text-l4'}>{player.points || '—'}</div>
+                        <div key={index} className="grid grid-cols-7 gap-1 px-2 py-2.5 rounded-lg text-xs text-center bg-s2">
+                          <div className="font-medium truncate text-l2">{player.name}</div>
+                          <div className={player.points < 0 ? 'text-agreen' : 'text-l1'}>{player.points || '—'}</div>
                           <div className={player.individualPenalty ? 'text-aorange' : 'text-l4'}>{player.individualPenalty || '—'}</div>
-                          <div className={gameData?.gameMode === 'group' && player.teamPenalty ? 'text-ared' : 'text-l4'}>{(gameData?.gameMode === 'group' && player.teamPenalty) ? player.teamPenalty : '—'}</div>
+                          <div className={gameData?.gameMode === 'group' && player.teamPenalty ? 'text-l1' : 'text-l4'}>{(gameData?.gameMode === 'group' && player.teamPenalty) ? player.teamPenalty : '—'}</div>
                           <div className={player.hasOkey1 || player.hasOkey2 ? 'text-aorange' : 'text-l4'}>{[player.hasOkey1 && '●', player.hasOkey2 && '●'].filter(Boolean).join(' ') || '—'}</div>
                           <div className={player.finished ? 'text-agreen' : 'text-l4'}>{player.finished ? '✓' : '—'}</div>
-                          <div className={`font-bold ${player.total > 0 ? 'text-ared' : player.total < 0 ? 'text-agreen' : 'text-l3'}`}>{player.total}</div>
+                          <div className={`font-bold ${player.total < 0 ? 'text-agreen' : 'text-l1'}`}>{player.total}</div>
                         </div>
                       );
                     })}
@@ -656,15 +643,10 @@ function GamePageContent() {
                   <div>İsim</div><div>Puan</div><div>Ceza</div><div>Okey</div><div>Bitti</div><div>Toplam</div>
                 </div>
                 {editRoundData.players.map((player, index) => {
-                  const isGroup1 = index === 0 || index === 2;
                   const inputCls = 'w-full px-1 py-1.5 bg-s2 border border-sep rounded-lg text-l1 text-center text-xs';
                   return (
-                    <div key={index} className={`grid grid-cols-6 gap-1 px-2 py-2 rounded-lg ${
-                      gameData?.gameMode === 'group'
-                        ? isGroup1 ? 'bg-[var(--team1-bg)]' : 'bg-[var(--team2-bg)]'
-                        : 'bg-s2'
-                    }`}>
-                      <div className={`text-xs font-medium self-center truncate ${gameData?.gameMode === 'group' ? (isGroup1 ? 'text-ablue' : 'text-apurple') : 'text-l2'}`}>{player.name}</div>
+                    <div key={index} className="grid grid-cols-6 gap-1 px-2 py-2 rounded-lg bg-s2">
+                      <div className="text-xs font-medium self-center truncate text-l2">{player.name}</div>
                       <div>
                         <input type="text" inputMode="decimal" pattern="^-?\d*$" value={editInputValues.points[index]}
                           onChange={(e) => {
@@ -703,14 +685,14 @@ function GamePageContent() {
                           {player.finished ? '✓' : '—'}
                         </button>
                       </div>
-                      <div className={`text-sm font-bold text-center self-center ${player.total > 0 ? 'text-ared' : player.total < 0 ? 'text-agreen' : 'text-l3'}`}>{player.total}</div>
+                      <div className={`text-sm font-bold text-center self-center ${player.total < 0 ? 'text-agreen' : 'text-l1'}`}>{player.total}</div>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="mt-3 px-3 py-2 bg-[var(--team1-bg)] border border-[var(--team1-border)] rounded-xl">
-                <p className="text-ablue/70 text-xs text-center">Toplam = Puan + Ceza − Bitirme (−101)</p>
+              <div className="mt-3 px-3 py-2 bg-s2 border border-sep rounded-xl">
+                <p className="text-l3 text-xs text-center">Toplam = Puan + Ceza − Bitirme (−101)</p>
               </div>
             </div>
           </div>
@@ -784,11 +766,11 @@ function GamePageContent() {
               {gameEndData.isGroup && (
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   <div className={`rounded-xl px-3 py-2.5 text-center border ${gameEndData.winnerType === 'group1' ? 'bg-[var(--success-bg)] border-[var(--success-border)]' : 'bg-s2 border-sep'}`}>
-                    <div className="text-ablue/70 text-xs truncate">{gameEndData.groupScores.group1.name}</div>
+                    <div className="text-l3 text-xs truncate">{gameEndData.groupScores.group1.name}</div>
                     <div className="text-l1 font-bold text-xl">{gameEndData.groupScores.group1.total}</div>
                   </div>
                   <div className={`rounded-xl px-3 py-2.5 text-center border ${gameEndData.winnerType === 'group2' ? 'bg-[var(--success-bg)] border-[var(--success-border)]' : 'bg-s2 border-sep'}`}>
-                    <div className="text-apurple/70 text-xs truncate">{gameEndData.groupScores.group2.name}</div>
+                    <div className="text-l3 text-xs truncate">{gameEndData.groupScores.group2.name}</div>
                     <div className="text-l1 font-bold text-xl">{gameEndData.groupScores.group2.total}</div>
                   </div>
                 </div>
@@ -801,14 +783,14 @@ function GamePageContent() {
                 </div>
                 {(gameEndData.playersWithStats || gameEndData.rankings)?.map((player: any, index: number) => (
                   <div key={index} className={`grid gap-1 px-3 py-2.5 border-t border-sep text-xs text-center ${gameEndData.isGroup ? 'grid-cols-6' : 'grid-cols-5'} ${index === 0 ? 'bg-[var(--warn-bg)]' : ''}`}>
-                    <div className={`font-medium text-center break-words leading-tight ${gameEndData.isGroup ? (player.isGroup1 ? 'text-ablue' : 'text-apurple') : 'text-l2'}`}>
+                    <div className="font-medium text-center break-words leading-tight text-l2">
                       <span className={index === 0 ? 'text-ayellow' : ''}>{index + 1}.</span> {player.name}
                     </div>
-                    <div className={`self-center ${player.score > 0 ? 'text-ared' : player.score < 0 ? 'text-agreen' : 'text-l4'}`}>{player.score}</div>
+                    <div className={`self-center ${player.score < 0 ? 'text-agreen' : 'text-l1'}`}>{player.score}</div>
                     <div className={`self-center ${(player.stats?.totalOkey || 0) > 0 ? 'text-aorange' : 'text-l4'}`}>{player.stats?.totalOkey || 0}</div>
                     <div className={`self-center ${((player.stats?.totalFinish || 0) + (player.stats?.totalHandFinish || 0)) > 0 ? 'text-agreen' : 'text-l4'}`}>{(player.stats?.totalFinish || 0) + (player.stats?.totalHandFinish || 0)}</div>
                     <div className={`self-center ${(player.stats?.totalIndividualPenalty || 0) > 0 ? 'text-aorange' : 'text-l4'}`}>{player.stats?.totalIndividualPenalty || 0}</div>
-                    {gameEndData.isGroup && <div className={`self-center ${(player.stats?.totalTeamPenalty || 0) > 0 ? 'text-ared' : 'text-l4'}`}>{player.stats?.totalTeamPenalty || 0}</div>}
+                    {gameEndData.isGroup && <div className="self-center text-l1">{player.stats?.totalTeamPenalty || 0}</div>}
                   </div>
                 ))}
               </div>
