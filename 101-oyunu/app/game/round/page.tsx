@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -252,43 +253,45 @@ function RoundPageContent() {
     else { const n = parseInt(value); if (!isNaN(n) && n >= -999 && n <= 999) updatePlayerScore(playerIndex, 'points', n); }
   };
 
-  const glassCard = 'bg-white/[0.04] backdrop-blur-sm border border-white/[0.08] rounded-2xl';
+  const glassCard = 'bg-s1 border border-sep rounded-2xl';
 
   if (!gameData) {
     return (
-      <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center">
-        <div className="text-white/30 text-sm">Yükleniyor...</div>
+      <div className="min-h-screen bg-s0 flex items-center justify-center">
+        <div className="text-l3 text-sm">Yükleniyor...</div>
       </div>
     );
   }
 
   const playerColor = (index: number) => {
-    if (gameData.gameMode !== 'group') return 'text-white/80';
-    return (index === 0 || index === 2) ? 'text-sky-300' : 'text-violet-300';
+    if (gameData.gameMode !== 'group') return 'text-l1';
+    return (index === 0 || index === 2) ? 'text-ablue' : 'text-apurple';
   };
 
   const playerBg = (index: number) => {
-    if (gameData.gameMode !== 'group') return 'bg-white/[0.03] border-white/[0.07]';
-    return (index === 0 || index === 2) ? 'bg-sky-500/[0.07] border-sky-500/[0.18]' : 'bg-violet-500/[0.07] border-violet-500/[0.18]';
+    if (gameData.gameMode !== 'group') return 'bg-s2 border-sep';
+    return (index === 0 || index === 2)
+      ? 'bg-[var(--team1-bg)] border-[var(--team1-border)]'
+      : 'bg-[var(--team2-bg)] border-[var(--team2-border)]';
   };
 
   return (
-    <div className="min-h-screen bg-[#0f0f14] pb-24">
+    <div className="min-h-screen bg-s0 pb-24">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#0f0f14]/90 backdrop-blur-md border-b border-white/[0.06]">
+      <div className="sticky top-0 z-10 bg-s0h backdrop-blur-md border-b border-sep">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           <button
             onClick={() => router.back()}
-            className="w-9 h-9 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white/60 flex items-center justify-center transition-colors active:scale-[0.94] touch-manipulation flex-shrink-0"
+            className="w-9 h-9 rounded-xl bg-s2 border border-sep text-l2 flex items-center justify-center transition-colors active:scale-[0.94] touch-manipulation flex-shrink-0"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
           <div className="flex-1 text-center">
-            <h1 className="text-white font-bold text-base">Round {gameData.currentRound}</h1>
+            <h1 className="text-l1 font-bold text-base">Round {gameData.currentRound}</h1>
           </div>
-          <div className="w-9" />
+          <ThemeToggle />
         </div>
       </div>
 
@@ -300,11 +303,11 @@ function RoundPageContent() {
             {gameData.players.map((name, index) => (
               <div key={index} className={`rounded-lg border px-1 py-2 text-center ${playerBg(index)}`}>
                 {gameData.dealerIndex === index && (
-                  <div className="flex justify-center mb-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" /></div>
+                  <div className="flex justify-center mb-1"><span className="w-1.5 h-1.5 rounded-full bg-agreen inline-block" /></div>
                 )}
                 <div className={`text-[11px] font-semibold leading-tight ${playerColor(index)}`} style={{wordBreak: 'break-word'}}>{name}</div>
                 {gameData.gameMode === 'group' && (
-                  <div className={`text-[9px] mt-0.5 truncate ${(index === 0 || index === 2) ? 'text-sky-400/40' : 'text-violet-400/40'}`}>
+                  <div className={`text-[9px] mt-0.5 truncate ${(index === 0 || index === 2) ? 'text-ablue/40' : 'text-apurple/40'}`}>
                     {(index === 0 || index === 2) ? gameData.group1Name : gameData.group2Name}
                   </div>
                 )}
@@ -315,7 +318,7 @@ function RoundPageContent() {
           <div className="px-3 pb-3 space-y-4">
             {/* Points Row */}
             <div>
-              <div className="text-white/35 text-xs font-medium mb-2">Puan</div>
+              <div className="text-l3 text-xs font-medium mb-2">Puan</div>
               <div className="grid grid-cols-4 gap-2">
                 {gameData.players.map((_, playerIndex) => {
                   const isDisabled = isPointInputDisabled(playerIndex);
@@ -328,8 +331,8 @@ function RoundPageContent() {
                       onChange={(e) => { if (!isDisabled) handlePointChange(playerIndex, e.target.value); }}
                       className={`w-full px-1 py-3 border rounded-xl text-center text-sm font-semibold transition-colors ${
                         isDisabled
-                          ? 'bg-white/[0.02] border-white/[0.05] text-white/20 cursor-not-allowed'
-                          : 'bg-white/[0.06] border-white/[0.08] text-white'
+                          ? 'bg-s2 border-sep text-l4 cursor-not-allowed'
+                          : 'bg-s2 border-sep text-l1'
                       }`}
                       placeholder="0" maxLength={4}
                     />
@@ -340,21 +343,21 @@ function RoundPageContent() {
 
             {/* Individual Penalty Row */}
             <div>
-              <div className="text-orange-400/60 text-xs font-medium mb-2">Bireysel Ceza</div>
+              <div className="text-aorange/70 text-xs font-medium mb-2">Bireysel Ceza</div>
               <div className="grid grid-cols-4 gap-2">
                 {gameData.players.map((_, playerIndex) => (
                   <div key={playerIndex} className="flex items-center justify-center gap-1">
                     <button
                       onClick={() => removePenalty(playerIndex, 'individual')}
                       disabled={playerScores[playerIndex]?.individualPenalty === 0}
-                      className="w-7 h-7 rounded-full bg-orange-500/15 border border-orange-500/25 text-orange-400 flex items-center justify-center text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-[0.93] touch-manipulation"
+                      className="w-7 h-7 rounded-full bg-[var(--danger-bg)] border border-[var(--danger-border)] text-aorange flex items-center justify-center text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-[0.93] touch-manipulation"
                     >−</button>
-                    <div className="text-white/80 font-semibold text-xs min-w-[22px] text-center">
+                    <div className="text-l2 font-semibold text-xs min-w-[22px] text-center">
                       {playerScores[playerIndex]?.individualPenalty || 0}
                     </div>
                     <button
                       onClick={() => addPenalty(playerIndex, 'individual')}
-                      className="w-7 h-7 rounded-full bg-orange-500/15 border border-orange-500/25 text-orange-400 flex items-center justify-center text-sm font-bold transition-colors active:scale-[0.93] touch-manipulation"
+                      className="w-7 h-7 rounded-full bg-[var(--danger-bg)] border border-[var(--danger-border)] text-aorange flex items-center justify-center text-sm font-bold transition-colors active:scale-[0.93] touch-manipulation"
                     >+</button>
                   </div>
                 ))}
@@ -364,21 +367,21 @@ function RoundPageContent() {
             {/* Team Penalty Row */}
             {gameData.gameMode === 'group' && (
               <div>
-                <div className="text-red-400/60 text-xs font-medium mb-2">Takım Cezası</div>
+                <div className="text-ared/70 text-xs font-medium mb-2">Takım Cezası</div>
                 <div className="grid grid-cols-4 gap-2">
                   {gameData.players.map((_, playerIndex) => (
                     <div key={playerIndex} className="flex items-center justify-center gap-1">
                       <button
                         onClick={() => removePenalty(playerIndex, 'team')}
                         disabled={playerScores[playerIndex]?.teamPenalty === 0}
-                        className="w-7 h-7 rounded-full bg-red-500/15 border border-red-500/25 text-red-400 flex items-center justify-center text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-[0.93] touch-manipulation"
+                        className="w-7 h-7 rounded-full bg-[var(--danger-bg)] border border-[var(--danger-border)] text-ared flex items-center justify-center text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-[0.93] touch-manipulation"
                       >−</button>
-                      <div className="text-white/80 font-semibold text-xs min-w-[22px] text-center">
+                      <div className="text-l2 font-semibold text-xs min-w-[22px] text-center">
                         {playerScores[playerIndex]?.teamPenalty || 0}
                       </div>
                       <button
                         onClick={() => addPenalty(playerIndex, 'team')}
-                        className="w-7 h-7 rounded-full bg-red-500/15 border border-red-500/25 text-red-400 flex items-center justify-center text-sm font-bold transition-colors active:scale-[0.93] touch-manipulation"
+                        className="w-7 h-7 rounded-full bg-[var(--danger-bg)] border border-[var(--danger-border)] text-ared flex items-center justify-center text-sm font-bold transition-colors active:scale-[0.93] touch-manipulation"
                       >+</button>
                     </div>
                   ))}
@@ -388,7 +391,7 @@ function RoundPageContent() {
 
             {/* Okey Row */}
             <div>
-              <div className="text-amber-400/60 text-xs font-medium mb-2">Okey</div>
+              <div className="text-ayellow/70 text-xs font-medium mb-2">Okey</div>
               <div className="grid grid-cols-4 gap-2">
                 {gameData.players.map((_, playerIndex) => (
                   <div key={playerIndex} className="flex justify-center gap-1">
@@ -397,8 +400,8 @@ function RoundPageContent() {
                         onClick={() => toggleOkey(playerIndex, n)}
                         className={`w-8 h-8 rounded-lg text-sm font-bold transition-all active:scale-[0.93] touch-manipulation ${
                           (n === 1 ? playerScores[playerIndex]?.hasOkey1 : playerScores[playerIndex]?.hasOkey2)
-                            ? 'bg-amber-500 text-white shadow-glow-amber'
-                            : 'bg-amber-500/10 border border-amber-500/25 text-amber-400/70'
+                            ? 'bg-ayellow text-black'
+                            : 'bg-[var(--warn-bg)] border border-[var(--warn-border)] text-ayellow/70'
                         }`}
                       >⚪</button>
                     ))}
@@ -409,13 +412,13 @@ function RoundPageContent() {
 
             {/* Total Row */}
             <div>
-              <div className="text-white/35 text-xs font-medium mb-2">Toplam</div>
+              <div className="text-l3 text-xs font-medium mb-2">Toplam</div>
               <div className="grid grid-cols-4 gap-2">
                 {gameData.players.map((_, playerIndex) => {
                   const total = getTotal(playerIndex);
                   return (
-                    <div key={playerIndex} className="bg-white/[0.05] border border-white/[0.08] rounded-xl py-2.5 text-center">
-                      <span className={`text-base font-bold ${total > 0 ? 'text-red-400' : total < 0 ? 'text-emerald-400' : 'text-white/40'}`}>
+                    <div key={playerIndex} className="bg-s2 border border-sep rounded-xl py-2.5 text-center">
+                      <span className={`text-base font-bold ${total > 0 ? 'text-ared' : total < 0 ? 'text-agreen' : 'text-l3'}`}>
                         {total}
                       </span>
                     </div>
@@ -429,8 +432,8 @@ function RoundPageContent() {
         {/* Finish Section */}
         <div className={`${glassCard} p-4`}>
           <div className="mb-3">
-            <h3 className="text-white/80 font-semibold text-sm">Oyunu Bitiren</h3>
-            <p className="text-white/30 text-xs mt-0.5">−101 puan · Sadece 1 oyuncu</p>
+            <h3 className="text-l2 font-semibold text-sm">Oyunu Bitiren</h3>
+            <p className="text-l3 text-xs mt-0.5">−101 puan · Sadece 1 oyuncu</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {gameData.players.map((playerName, playerIndex) => (
@@ -440,10 +443,10 @@ function RoundPageContent() {
                 disabled={playerScores.some(s => s.handFinished)}
                 className={`py-3.5 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-between touch-manipulation active:scale-[0.97] ${
                   playerScores[playerIndex]?.finished && !playerScores[playerIndex]?.handFinished
-                    ? 'bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-300'
+                    ? 'bg-[var(--success-bg)] border-2 border-[var(--success-border)] text-agreen'
                     : playerScores.some(s => s.handFinished)
-                    ? 'bg-white/[0.02] border border-white/[0.05] text-white/20 cursor-not-allowed'
-                    : 'bg-white/[0.05] border border-white/[0.08] text-white/60 hover:bg-white/[0.08]'
+                    ? 'bg-s2 border border-sep text-l4 cursor-not-allowed'
+                    : 'bg-s2 border border-sep text-l2'
                 }`}
               >
                 <span>{playerName}</span>
@@ -452,17 +455,17 @@ function RoundPageContent() {
             ))}
           </div>
           {gameData.gameMode === 'group' && (
-            <div className="mt-3 px-3 py-2 bg-sky-500/[0.06] border border-sky-500/[0.12] rounded-xl">
-              <p className="text-sky-300/60 text-xs">Takım oyununda takım arkadaşının puanı otomatik 0 olur</p>
+            <div className="mt-3 px-3 py-2 bg-[var(--team1-bg)] border border-[var(--team1-border)] rounded-xl">
+              <p className="text-ablue/60 text-xs">Takım oyununda takım arkadaşının puanı otomatik 0 olur</p>
             </div>
           )}
         </div>
 
         {/* Hand Finish Section */}
-        <div className="bg-violet-500/[0.06] border border-violet-500/[0.15] rounded-2xl p-4">
+        <div className="bg-[var(--purple-bg)] border border-[var(--purple-border)] rounded-2xl p-4">
           <div className="mb-3">
-            <h3 className="text-violet-200/80 font-semibold text-sm">Elden Bitiren</h3>
-            <p className="text-violet-300/40 text-xs mt-0.5">
+            <h3 className="text-apurple font-semibold text-sm">Elden Bitiren</h3>
+            <p className="text-apurple/50 text-xs mt-0.5">
               −202 puan · {gameData.gameMode === 'group' ? 'Karşı takıma 404 puan' : 'Diğer oyunculara 404 puan'}
             </p>
           </div>
@@ -474,10 +477,10 @@ function RoundPageContent() {
                 disabled={playerScores.some(s => s.finished && !s.handFinished)}
                 className={`py-3.5 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-between touch-manipulation active:scale-[0.97] ${
                   playerScores[playerIndex]?.handFinished
-                    ? 'bg-violet-500/30 border-2 border-violet-400/50 text-violet-200'
+                    ? 'bg-apurple/20 border-2 border-apurple/50 text-apurple'
                     : playerScores.some(s => s.finished && !s.handFinished)
-                    ? 'bg-white/[0.02] border border-white/[0.05] text-white/20 cursor-not-allowed'
-                    : 'bg-violet-500/10 border border-violet-500/20 text-violet-300/60 hover:bg-violet-500/15'
+                    ? 'bg-s2 border border-sep text-l4 cursor-not-allowed'
+                    : 'bg-[var(--purple-bg)] border border-[var(--purple-border)] text-apurple/70'
                 }`}
               >
                 <span>{playerName}</span>
@@ -485,22 +488,22 @@ function RoundPageContent() {
               </button>
             ))}
           </div>
-          <div className="mt-3 px-3 py-2 bg-violet-500/[0.06] border border-violet-500/[0.12] rounded-xl">
-            <p className="text-violet-300/50 text-xs">Tüm puanlar otomatik hesaplanır, manuel giriş devre dışı kalır</p>
+          <div className="mt-3 px-3 py-2 bg-[var(--purple-bg)] border border-[var(--purple-border)] rounded-xl">
+            <p className="text-apurple/50 text-xs">Tüm puanlar otomatik hesaplanır, manuel giriş devre dışı kalır</p>
           </div>
         </div>
       </div>
 
       {/* Sticky Submit Button */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#0f0f14]/90 backdrop-blur-md border-t border-white/[0.06] px-4 py-3">
+      <div className="fixed bottom-0 left-0 right-0 bg-s0h backdrop-blur-md border-t border-sep px-4 py-3">
         <div className="max-w-2xl mx-auto">
           <button
             onClick={handleSubmit}
             disabled={submitting}
             className={`w-full py-4 rounded-xl font-bold text-base transition-all touch-manipulation ${
               submitting
-                ? 'bg-white/[0.06] border border-white/[0.08] text-white/30 cursor-not-allowed'
-                : 'bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-black shadow-glow-green'
+                ? 'bg-s2 border border-sep text-l4 cursor-not-allowed'
+                : 'bg-agreen hover:opacity-90 active:scale-[0.98] text-black'
             }`}
           >
             {submitting ? 'Kaydediliyor...' : "Round'u Kaydet"}
@@ -514,8 +517,8 @@ function RoundPageContent() {
 export default function RoundPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center">
-        <div className="text-white/30 text-sm">Yükleniyor...</div>
+      <div className="min-h-screen bg-s0 flex items-center justify-center">
+        <div className="text-l3 text-sm">Yükleniyor...</div>
       </div>
     }>
       <RoundPageContent />

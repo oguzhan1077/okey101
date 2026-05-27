@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -367,24 +368,25 @@ function GamePageContent() {
     setEditRoundData({ ...editRoundData, players: updatedPlayers });
   };
 
-  const glassCard = 'bg-white/[0.04] backdrop-blur-sm border border-white/[0.08] rounded-2xl';
+  const glassCard = 'bg-s1 border border-sep rounded-2xl';
   const modalBase = 'fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 z-50';
-  const modalCard = 'bg-[#131318] border border-white/[0.10] rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto';
+  const modalCard = 'bg-s1 border border-sep rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto';
 
   if (!gameData) {
     return (
-      <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center">
-        <div className="text-white/40 text-sm">Yükleniyor...</div>
+      <div className="min-h-screen bg-s0 flex items-center justify-center">
+        <div className="text-l3 text-sm">Yükleniyor...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f14]">
+    <div className="min-h-screen bg-s0">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-[#0f0f14]/90 backdrop-blur-md border-b border-white/[0.06]">
+      <div className="sticky top-0 z-10 bg-s0h backdrop-blur-md border-b border-sep">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-base font-bold text-white">101 Oyunu</h1>
+          <h1 className="text-base font-bold text-l1">101 Oyunu</h1>
+          <ThemeToggle />
         </div>
       </div>
 
@@ -399,32 +401,34 @@ function GamePageContent() {
                   key={index}
                   className={`rounded-xl p-2.5 border text-center ${
                     gameData.gameMode === 'group'
-                      ? isGroup1 ? 'bg-sky-500/[0.07] border-sky-500/[0.18]' : 'bg-violet-500/[0.07] border-violet-500/[0.18]'
-                      : 'bg-white/[0.03] border-white/[0.07]'
+                      ? isGroup1
+                        ? 'bg-[var(--team1-bg)] border-[var(--team1-border)]'
+                        : 'bg-[var(--team2-bg)] border-[var(--team2-border)]'
+                      : 'bg-s2 border-sep'
                   }`}
                 >
                   {gameData.dealerIndex === index && (
                     <div className="flex justify-center mb-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" title="Dağıtan" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-agreen inline-block" title="Dağıtan" />
                     </div>
                   )}
                   <div
                     className={`font-semibold text-xs leading-tight ${
-                      gameData.gameMode === 'group' ? (isGroup1 ? 'text-sky-300' : 'text-violet-300') : 'text-white/90'
+                      gameData.gameMode === 'group' ? (isGroup1 ? 'text-ablue' : 'text-apurple') : 'text-l1'
                     }`}
                     style={{wordBreak: 'break-word'}}
                   >
                     {player.name}
                   </div>
                   {gameData.gameMode === 'group' && (
-                    <div className={`text-[10px] mt-0.5 truncate ${isGroup1 ? 'text-sky-400/50' : 'text-violet-400/50'}`}>
+                    <div className={`text-[10px] mt-0.5 truncate ${isGroup1 ? 'text-ablue/50' : 'text-apurple/50'}`}>
                       {isGroup1 ? gameData.group1Name : gameData.group2Name}
                     </div>
                   )}
                   {showCalculation && (
-                    <div className="mt-2 pt-2 border-t border-white/[0.07]">
+                    <div className="mt-2 pt-2 border-t border-sep">
                       <div className={`text-sm font-bold ${
-                        getTotalScore(index) > 0 ? 'text-red-400' : getTotalScore(index) < 0 ? 'text-emerald-400' : 'text-white/40'
+                        getTotalScore(index) > 0 ? 'text-ared' : getTotalScore(index) < 0 ? 'text-agreen' : 'text-l3'
                       }`}>
                         {getTotalScore(index)}
                       </div>
@@ -440,13 +444,13 @@ function GamePageContent() {
             const g = getGroupScores()!;
             return (
               <div className="grid grid-cols-2 gap-2 mt-3">
-                <div className="bg-sky-500/[0.07] border border-sky-500/[0.18] rounded-xl px-3 py-2.5 text-center">
-                  <div className="text-sky-300/70 text-[11px] font-medium truncate">{g.group1.name}</div>
-                  <div className={`text-xl font-bold mt-0.5 ${g.group1.total > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{g.group1.total}</div>
+                <div className="bg-[var(--team1-bg)] border border-[var(--team1-border)] rounded-xl px-3 py-2.5 text-center">
+                  <div className="text-ablue/70 text-[11px] font-medium truncate">{g.group1.name}</div>
+                  <div className={`text-xl font-bold mt-0.5 ${g.group1.total > 0 ? 'text-ared' : 'text-agreen'}`}>{g.group1.total}</div>
                 </div>
-                <div className="bg-violet-500/[0.07] border border-violet-500/[0.18] rounded-xl px-3 py-2.5 text-center">
-                  <div className="text-violet-300/70 text-[11px] font-medium truncate">{g.group2.name}</div>
-                  <div className={`text-xl font-bold mt-0.5 ${g.group2.total > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{g.group2.total}</div>
+                <div className="bg-[var(--team2-bg)] border border-[var(--team2-border)] rounded-xl px-3 py-2.5 text-center">
+                  <div className="text-apurple/70 text-[11px] font-medium truncate">{g.group2.name}</div>
+                  <div className={`text-xl font-bold mt-0.5 ${g.group2.total > 0 ? 'text-ared' : 'text-agreen'}`}>{g.group2.total}</div>
                 </div>
               </div>
             );
@@ -457,11 +461,11 @@ function GamePageContent() {
             const diff = getScoreDifferences();
             if (!diff) return null;
             return (
-              <div className="mt-2 flex items-center justify-between bg-white/[0.03] rounded-xl px-4 py-2.5 text-sm">
-                <span className="text-white/40 text-xs">Önde</span>
-                <span className="text-amber-400 font-semibold">{diff.leader}</span>
-                <span className="text-white/40 text-xs">Fark</span>
-                <span className="text-sky-400 font-semibold">{diff.difference} puan</span>
+              <div className="mt-2 flex items-center justify-between bg-s2 rounded-xl px-4 py-2.5 text-sm">
+                <span className="text-l3 text-xs">Önde</span>
+                <span className="text-ayellow font-semibold">{diff.leader}</span>
+                <span className="text-l3 text-xs">Fark</span>
+                <span className="text-ablue font-semibold">{diff.difference} puan</span>
               </div>
             );
           })()}
@@ -469,40 +473,40 @@ function GamePageContent() {
 
         {/* Round History */}
         <div className={`${glassCard} overflow-hidden`}>
-          <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
-            <h2 className="text-white/60 text-xs font-medium uppercase tracking-wide">Round Geçmişi</h2>
-            <span className="text-white/30 text-xs">{players[0]?.scores.length || 0} round</span>
+          <div className="px-4 py-3 border-b border-sep flex items-center justify-between">
+            <h2 className="text-l3 text-xs font-medium uppercase tracking-wide">Round Geçmişi</h2>
+            <span className="text-l4 text-xs">{players[0]?.scores.length || 0} round</span>
           </div>
 
           {players[0]?.scores.length === 0 ? (
             <div className="py-10 text-center">
-              <p className="text-white/20 text-sm">Henüz round oynanmadı</p>
+              <p className="text-l4 text-sm">Henüz round oynanmadı</p>
             </div>
           ) : (
             <div>
-              <div className="grid grid-cols-6 gap-1 px-3 py-2 bg-white/[0.02]">
-                <div className="text-white/25 text-[10px] text-center">#</div>
+              <div className="grid grid-cols-6 gap-1 px-3 py-2 bg-s2">
+                <div className="text-l4 text-[10px] text-center">#</div>
                 {players.map((player, idx) => {
                   const isGroup1 = idx === 0 || idx === 2;
                   return (
                     <div key={idx} className={`text-[10px] text-center font-medium truncate px-0.5 ${
-                      gameData.gameMode === 'group' ? (isGroup1 ? 'text-sky-400/50' : 'text-violet-400/50') : 'text-white/35'
+                      gameData.gameMode === 'group' ? (isGroup1 ? 'text-ablue/60' : 'text-apurple/60') : 'text-l3'
                     }`}>
                       {player.name}
                     </div>
                   );
                 })}
-                <div className="text-white/25 text-[10px] text-center"></div>
+                <div className="text-l4 text-[10px] text-center"></div>
               </div>
 
               {players[0].scores.map((_, roundIndex) => (
-                <div key={roundIndex} className="grid grid-cols-6 gap-1 px-3 py-2 border-t border-white/[0.04] hover:bg-white/[0.015] transition-colors">
-                  <div className="text-white/40 text-xs text-center self-center">{roundIndex + 1}</div>
+                <div key={roundIndex} className="grid grid-cols-6 gap-1 px-3 py-2 border-t border-sep hover:bg-s2 transition-colors">
+                  <div className="text-l3 text-xs text-center self-center">{roundIndex + 1}</div>
                   {players.map((player, playerIndex) => {
                     const score = player.scores[roundIndex];
                     return (
                       <div key={playerIndex} className="text-center self-center">
-                        <span className={`text-xs font-bold ${score > 0 ? 'text-red-400' : score < 0 ? 'text-emerald-400' : 'text-white/30'}`}>
+                        <span className={`text-xs font-bold ${score > 0 ? 'text-ared' : score < 0 ? 'text-agreen' : 'text-l4'}`}>
                           {score}
                         </span>
                       </div>
@@ -515,7 +519,7 @@ function GamePageContent() {
                         setShowCalculation(false);
                         setIsEditMode(false);
                       }}
-                      className="w-6 h-6 rounded-md bg-sky-500/15 border border-sky-500/25 text-sky-400 flex items-center justify-center transition-colors active:scale-[0.93] touch-manipulation"
+                      className="w-6 h-6 rounded-md bg-[var(--team1-bg)] border border-[var(--team1-border)] text-ablue flex items-center justify-center transition-colors active:scale-[0.93] touch-manipulation"
                     >
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -528,7 +532,7 @@ function GamePageContent() {
                         setSelectedRoundDetails(null);
                         setShowCalculation(false);
                       }}
-                      className="w-6 h-6 rounded-md bg-amber-500/15 border border-amber-500/25 text-amber-400 flex items-center justify-center transition-colors active:scale-[0.93] touch-manipulation"
+                      className="w-6 h-6 rounded-md bg-[var(--warn-bg)] border border-[var(--warn-border)] text-ayellow flex items-center justify-center transition-colors active:scale-[0.93] touch-manipulation"
                     >
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -544,12 +548,12 @@ function GamePageContent() {
         {/* Add Round */}
         <div className={`${glassCard} p-4`}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-white/40 text-sm">Sonraki round</span>
-            <span className="text-white font-semibold text-sm">Round {currentRound}</span>
+            <span className="text-l3 text-sm">Sonraki round</span>
+            <span className="text-l1 font-semibold text-sm">Round {currentRound}</span>
           </div>
           <button
             onClick={goToRoundPage}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-black font-bold py-4 rounded-xl text-base transition-all shadow-glow-green touch-manipulation"
+            className="w-full bg-agreen hover:opacity-90 active:scale-[0.98] text-black font-bold py-4 rounded-xl text-base transition-all touch-manipulation"
           >
             + Yeni Round Ekle
           </button>
@@ -559,21 +563,21 @@ function GamePageContent() {
         <div className="grid grid-cols-3 gap-2 pb-4">
           <button
             onClick={() => { calculateTotals(); setSelectedRoundDetails(null); }}
-            className="bg-white/[0.05] hover:bg-white/[0.08] active:scale-[0.97] border border-white/[0.08] text-white/70 py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
+            className="bg-s2 hover:opacity-90 active:scale-[0.97] border border-sep text-l2 py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
           >
             <span className="text-lg">📊</span>
             <span className="text-xs">Skorlar</span>
           </button>
           <button
             onClick={finishGame}
-            className="bg-red-500/15 hover:bg-red-500/25 active:scale-[0.97] border border-red-500/25 text-red-400 py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
+            className="bg-[var(--danger-bg)] hover:opacity-90 active:scale-[0.97] border border-[var(--danger-border)] text-ared py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
           >
             <span className="text-lg">🏁</span>
             <span className="text-xs">Bitir</span>
           </button>
           <button
             onClick={startNewGame}
-            className="bg-white/[0.03] hover:bg-white/[0.06] active:scale-[0.97] border border-white/[0.06] text-white/40 py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
+            className="bg-s2 hover:opacity-90 active:scale-[0.97] border border-sep text-l3 py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
           >
             <span className="text-lg">🎮</span>
             <span className="text-xs">Yeni Oyun</span>
@@ -591,35 +595,37 @@ function GamePageContent() {
             <div className={`${modalCard} max-w-lg`} onClick={e => e.stopPropagation()}>
               <div className="p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-white font-semibold">Round {selectedRoundDetails + 1} — Detay</h3>
-                  <button onClick={() => setSelectedRoundDetails(null)} className="w-8 h-8 rounded-lg bg-white/[0.06] border border-white/[0.08] text-white/50 flex items-center justify-center transition-colors active:scale-[0.95] touch-manipulation">
+                  <h3 className="text-l1 font-semibold">Round {selectedRoundDetails + 1} — Detay</h3>
+                  <button onClick={() => setSelectedRoundDetails(null)} className="w-8 h-8 rounded-lg bg-s2 border border-sep text-l3 flex items-center justify-center transition-colors active:scale-[0.95] touch-manipulation">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
                 {detail ? (
                   <div className="space-y-2">
-                    <div className="grid grid-cols-7 gap-1 px-2 py-1.5 bg-white/[0.03] rounded-lg text-[10px] text-white/40 text-center">
+                    <div className="grid grid-cols-7 gap-1 px-2 py-1.5 bg-s2 rounded-lg text-[10px] text-l3 text-center">
                       <div>İsim</div><div>Puan</div><div>B.Ceza</div><div>T.Ceza</div><div>Okey</div><div>Bitti</div><div>Toplam</div>
                     </div>
                     {detail.players.map((player, index) => {
                       const isGroup1 = index === 0 || index === 2;
                       return (
                         <div key={index} className={`grid grid-cols-7 gap-1 px-2 py-2.5 rounded-lg text-xs text-center ${
-                          gameData?.gameMode === 'group' ? (isGroup1 ? 'bg-sky-500/[0.06]' : 'bg-violet-500/[0.06]') : 'bg-white/[0.03]'
+                          gameData?.gameMode === 'group'
+                            ? isGroup1 ? 'bg-[var(--team1-bg)]' : 'bg-[var(--team2-bg)]'
+                            : 'bg-s2'
                         }`}>
-                          <div className={`font-medium truncate ${gameData?.gameMode === 'group' ? (isGroup1 ? 'text-sky-300' : 'text-violet-300') : 'text-white/80'}`}>{player.name}</div>
-                          <div className={player.points > 0 ? 'text-red-400' : player.points < 0 ? 'text-emerald-400' : 'text-white/30'}>{player.points || '—'}</div>
-                          <div className={player.individualPenalty ? 'text-orange-400' : 'text-white/20'}>{player.individualPenalty || '—'}</div>
-                          <div className={gameData?.gameMode === 'group' && player.teamPenalty ? 'text-red-400' : 'text-white/20'}>{(gameData?.gameMode === 'group' && player.teamPenalty) ? player.teamPenalty : '—'}</div>
-                          <div className={player.hasOkey1 || player.hasOkey2 ? 'text-amber-400' : 'text-white/20'}>{[player.hasOkey1 && '⚪', player.hasOkey2 && '⚪'].filter(Boolean).join('') || '—'}</div>
-                          <div className={player.finished ? 'text-emerald-400' : 'text-white/20'}>{player.finished ? '✓' : '—'}</div>
-                          <div className={`font-bold ${player.total > 0 ? 'text-red-400' : player.total < 0 ? 'text-emerald-400' : 'text-white/40'}`}>{player.total}</div>
+                          <div className={`font-medium truncate ${gameData?.gameMode === 'group' ? (isGroup1 ? 'text-ablue' : 'text-apurple') : 'text-l2'}`}>{player.name}</div>
+                          <div className={player.points > 0 ? 'text-ared' : player.points < 0 ? 'text-agreen' : 'text-l4'}>{player.points || '—'}</div>
+                          <div className={player.individualPenalty ? 'text-aorange' : 'text-l4'}>{player.individualPenalty || '—'}</div>
+                          <div className={gameData?.gameMode === 'group' && player.teamPenalty ? 'text-ared' : 'text-l4'}>{(gameData?.gameMode === 'group' && player.teamPenalty) ? player.teamPenalty : '—'}</div>
+                          <div className={player.hasOkey1 || player.hasOkey2 ? 'text-ayellow' : 'text-l4'}>{[player.hasOkey1 && '⚪', player.hasOkey2 && '⚪'].filter(Boolean).join('') || '—'}</div>
+                          <div className={player.finished ? 'text-agreen' : 'text-l4'}>{player.finished ? '✓' : '—'}</div>
+                          <div className={`font-bold ${player.total > 0 ? 'text-ared' : player.total < 0 ? 'text-agreen' : 'text-l3'}`}>{player.total}</div>
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="text-white/30 text-center py-8">Detay bulunamadı</div>
+                  <div className="text-l3 text-center py-8">Detay bulunamadı</div>
                 )}
               </div>
             </div>
@@ -633,29 +639,31 @@ function GamePageContent() {
           <div className={`${modalCard} max-w-lg`}>
             <div className="p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-white font-semibold">Round {editRoundData.round} — Düzenle</h3>
+                <h3 className="text-l1 font-semibold">Round {editRoundData.round} — Düzenle</h3>
                 <div className="flex gap-2">
-                  <button onClick={saveRoundEdit} className="bg-emerald-500 active:scale-[0.96] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all shadow-glow-green touch-manipulation">
+                  <button onClick={saveRoundEdit} className="bg-agreen active:scale-[0.96] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all touch-manipulation">
                     Kaydet
                   </button>
-                  <button onClick={cancelRoundEdit} className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white/50 flex items-center justify-center transition-colors active:scale-[0.95] touch-manipulation">
+                  <button onClick={cancelRoundEdit} className="w-9 h-9 rounded-xl bg-s2 border border-sep text-l3 flex items-center justify-center transition-colors active:scale-[0.95] touch-manipulation">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <div className="grid grid-cols-6 gap-1 px-2 py-1.5 bg-white/[0.03] rounded-lg text-[10px] text-white/40 text-center">
+                <div className="grid grid-cols-6 gap-1 px-2 py-1.5 bg-s2 rounded-lg text-[10px] text-l3 text-center">
                   <div>İsim</div><div>Puan</div><div>Ceza</div><div>Okey</div><div>Bitti</div><div>Toplam</div>
                 </div>
                 {editRoundData.players.map((player, index) => {
                   const isGroup1 = index === 0 || index === 2;
-                  const inputCls = 'w-full px-1 py-1.5 bg-white/[0.06] border border-white/[0.08] rounded-lg text-white text-center text-xs';
+                  const inputCls = 'w-full px-1 py-1.5 bg-s2 border border-sep rounded-lg text-l1 text-center text-xs';
                   return (
                     <div key={index} className={`grid grid-cols-6 gap-1 px-2 py-2 rounded-lg ${
-                      gameData?.gameMode === 'group' ? (isGroup1 ? 'bg-sky-500/[0.06]' : 'bg-violet-500/[0.06]') : 'bg-white/[0.03]'
+                      gameData?.gameMode === 'group'
+                        ? isGroup1 ? 'bg-[var(--team1-bg)]' : 'bg-[var(--team2-bg)]'
+                        : 'bg-s2'
                     }`}>
-                      <div className={`text-xs font-medium self-center truncate ${gameData?.gameMode === 'group' ? (isGroup1 ? 'text-sky-300' : 'text-violet-300') : 'text-white/80'}`}>{player.name}</div>
+                      <div className={`text-xs font-medium self-center truncate ${gameData?.gameMode === 'group' ? (isGroup1 ? 'text-ablue' : 'text-apurple') : 'text-l2'}`}>{player.name}</div>
                       <div>
                         <input type="text" inputMode="decimal" pattern="^-?\d*$" value={editInputValues.points[index]}
                           onChange={(e) => {
@@ -680,24 +688,24 @@ function GamePageContent() {
                       </div>
                       <div className="flex justify-center items-center gap-0.5">
                         <button onClick={() => updateEditPlayerData(index, 'hasOkey1', !player.hasOkey1)}
-                          className={`w-5 h-5 rounded-full text-[10px] transition-colors touch-manipulation ${player.hasOkey1 ? 'bg-amber-500 text-white' : 'bg-amber-500/10 border border-amber-500/25 text-amber-400'}`}>⚪</button>
+                          className={`w-5 h-5 rounded-full text-[10px] transition-colors touch-manipulation ${player.hasOkey1 ? 'bg-ayellow text-black' : 'bg-[var(--warn-bg)] border border-[var(--warn-border)] text-ayellow'}`}>⚪</button>
                         <button onClick={() => updateEditPlayerData(index, 'hasOkey2', !player.hasOkey2)}
-                          className={`w-5 h-5 rounded-full text-[10px] transition-colors touch-manipulation ${player.hasOkey2 ? 'bg-amber-500 text-white' : 'bg-amber-500/10 border border-amber-500/25 text-amber-400'}`}>⚪</button>
+                          className={`w-5 h-5 rounded-full text-[10px] transition-colors touch-manipulation ${player.hasOkey2 ? 'bg-ayellow text-black' : 'bg-[var(--warn-bg)] border border-[var(--warn-border)] text-ayellow'}`}>⚪</button>
                       </div>
                       <div className="flex justify-center items-center">
                         <button onClick={() => updateEditPlayerData(index, 'finished', !player.finished)}
-                          className={`w-7 h-6 rounded-md text-[10px] font-bold transition-colors touch-manipulation ${player.finished ? 'bg-emerald-500/30 border border-emerald-500/40 text-emerald-400' : 'bg-white/[0.05] border border-white/[0.08] text-white/30'}`}>
+                          className={`w-7 h-6 rounded-md text-[10px] font-bold transition-colors touch-manipulation ${player.finished ? 'bg-[var(--success-bg)] border border-[var(--success-border)] text-agreen' : 'bg-s2 border border-sep text-l4'}`}>
                           {player.finished ? '✓' : '—'}
                         </button>
                       </div>
-                      <div className={`text-sm font-bold text-center self-center ${player.total > 0 ? 'text-red-400' : player.total < 0 ? 'text-emerald-400' : 'text-white/40'}`}>{player.total}</div>
+                      <div className={`text-sm font-bold text-center self-center ${player.total > 0 ? 'text-ared' : player.total < 0 ? 'text-agreen' : 'text-l3'}`}>{player.total}</div>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="mt-3 px-3 py-2 bg-sky-500/[0.07] border border-sky-500/[0.15] rounded-xl">
-                <p className="text-sky-300/70 text-xs text-center">Toplam = Puan + Ceza − Bitirme (−101)</p>
+              <div className="mt-3 px-3 py-2 bg-[var(--team1-bg)] border border-[var(--team1-border)] rounded-xl">
+                <p className="text-ablue/70 text-xs text-center">Toplam = Puan + Ceza − Bitirme (−101)</p>
               </div>
             </div>
           </div>
@@ -710,27 +718,29 @@ function GamePageContent() {
           <div className={modalCard}>
             <div className="p-6 text-center">
               <div className="text-4xl mb-3">{confirmAction === 'finish' ? '🏁' : '🎮'}</div>
-              <h2 className="text-white font-bold text-lg mb-2">
+              <h2 className="text-l1 font-bold text-lg mb-2">
                 {confirmAction === 'finish' ? 'Oyunu Bitir' : 'Yeni Oyun'}
               </h2>
-              <p className="text-white/50 text-sm mb-5 leading-relaxed">
+              <p className="text-l3 text-sm mb-5 leading-relaxed">
                 {confirmAction === 'finish'
                   ? 'Oyunu bitirip sonuç ekranına geçmek istediğinizden emin misiniz?'
                   : 'Mevcut oyun verileri silinecek. Devam etmek istiyor musunuz?'}
               </p>
-              <div className="bg-amber-500/[0.08] border border-amber-500/[0.20] rounded-xl px-4 py-2.5 mb-5">
-                <span className="text-amber-400/80 text-xs">
+              <div className="bg-[var(--warn-bg)] border border-[var(--warn-border)] rounded-xl px-4 py-2.5 mb-5">
+                <span className="text-ayellow/80 text-xs">
                   {confirmAction === 'finish' ? 'Bu işlem geri alınamaz!' : 'Tüm round verileri kaybolacak!'}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <button onClick={() => { setShowConfirmModal(false); setConfirmAction(null); }}
-                  className="bg-white/[0.05] border border-white/[0.08] text-white/60 py-3 rounded-xl font-medium text-sm transition-colors active:scale-[0.97] touch-manipulation">
+                  className="bg-s2 border border-sep text-l2 py-3 rounded-xl font-medium text-sm transition-colors active:scale-[0.97] touch-manipulation">
                   İptal
                 </button>
                 <button onClick={handleConfirmAction}
                   className={`py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] touch-manipulation ${
-                    confirmAction === 'finish' ? 'bg-red-500/80 hover:bg-red-500 text-white' : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-glow-green'
+                    confirmAction === 'finish'
+                      ? 'bg-[var(--danger-bg)] border border-[var(--danger-border)] text-ared hover:opacity-90'
+                      : 'bg-agreen hover:opacity-90 text-black'
                   }`}>
                   {confirmAction === 'finish' ? 'Evet, Bitir' : 'Evet, Başlat'}
                 </button>
@@ -747,45 +757,45 @@ function GamePageContent() {
             <div className="p-6">
               <div className="text-center mb-5">
                 <div className="text-4xl mb-2">{gameEndData.winnerType === 'tie' ? '🤝' : '🏆'}</div>
-                <h2 className="text-white font-bold text-lg">{gameEndData.winnerType === 'tie' ? 'Berabere!' : 'Oyun Bitti!'}</h2>
+                <h2 className="text-l1 font-bold text-lg">{gameEndData.winnerType === 'tie' ? 'Berabere!' : 'Oyun Bitti!'}</h2>
               </div>
 
-              <div className="bg-amber-500/[0.10] border border-amber-500/[0.22] rounded-xl px-4 py-3 text-center mb-4">
-                <div className="text-amber-300/60 text-xs mb-1">{gameEndData.winnerType === 'tie' ? 'Sonuç' : 'Kazanan'}</div>
-                <div className="text-amber-400 font-bold text-lg">{gameEndData.winner}</div>
+              <div className="bg-[var(--warn-bg)] border border-[var(--warn-border)] rounded-xl px-4 py-3 text-center mb-4">
+                <div className="text-ayellow/60 text-xs mb-1">{gameEndData.winnerType === 'tie' ? 'Sonuç' : 'Kazanan'}</div>
+                <div className="text-ayellow font-bold text-lg">{gameEndData.winner}</div>
                 {gameEndData.winnerType === 'single' && gameEndData.winnerScore !== undefined && (
-                  <div className="text-amber-300/50 text-xs mt-0.5">{gameEndData.winnerScore} puan</div>
+                  <div className="text-ayellow/50 text-xs mt-0.5">{gameEndData.winnerScore} puan</div>
                 )}
               </div>
 
               {gameEndData.isGroup && (
                 <div className="grid grid-cols-2 gap-2 mb-4">
-                  <div className={`rounded-xl px-3 py-2.5 text-center border ${gameEndData.winnerType === 'group1' ? 'bg-emerald-500/[0.08] border-emerald-500/25' : 'bg-white/[0.03] border-white/[0.07]'}`}>
-                    <div className="text-sky-300/70 text-xs truncate">{gameEndData.groupScores.group1.name}</div>
-                    <div className="text-white font-bold text-xl">{gameEndData.groupScores.group1.total}</div>
+                  <div className={`rounded-xl px-3 py-2.5 text-center border ${gameEndData.winnerType === 'group1' ? 'bg-[var(--success-bg)] border-[var(--success-border)]' : 'bg-s2 border-sep'}`}>
+                    <div className="text-ablue/70 text-xs truncate">{gameEndData.groupScores.group1.name}</div>
+                    <div className="text-l1 font-bold text-xl">{gameEndData.groupScores.group1.total}</div>
                   </div>
-                  <div className={`rounded-xl px-3 py-2.5 text-center border ${gameEndData.winnerType === 'group2' ? 'bg-emerald-500/[0.08] border-emerald-500/25' : 'bg-white/[0.03] border-white/[0.07]'}`}>
-                    <div className="text-violet-300/70 text-xs truncate">{gameEndData.groupScores.group2.name}</div>
-                    <div className="text-white font-bold text-xl">{gameEndData.groupScores.group2.total}</div>
+                  <div className={`rounded-xl px-3 py-2.5 text-center border ${gameEndData.winnerType === 'group2' ? 'bg-[var(--success-bg)] border-[var(--success-border)]' : 'bg-s2 border-sep'}`}>
+                    <div className="text-apurple/70 text-xs truncate">{gameEndData.groupScores.group2.name}</div>
+                    <div className="text-l1 font-bold text-xl">{gameEndData.groupScores.group2.total}</div>
                   </div>
                 </div>
               )}
 
-              <div className="rounded-xl overflow-hidden border border-white/[0.06] mb-4">
-                <div className={`grid gap-1 px-3 py-2 bg-white/[0.04] text-[10px] text-white/35 text-center ${gameEndData.isGroup ? 'grid-cols-6' : 'grid-cols-5'}`}>
+              <div className="rounded-xl overflow-hidden border border-sep mb-4">
+                <div className={`grid gap-1 px-3 py-2 bg-s2 text-[10px] text-l3 text-center ${gameEndData.isGroup ? 'grid-cols-6' : 'grid-cols-5'}`}>
                   <div>Oyuncu</div><div>Puan</div><div>Okey</div><div>Bitti</div><div>B.Ceza</div>
                   {gameEndData.isGroup && <div>T.Ceza</div>}
                 </div>
                 {(gameEndData.playersWithStats || gameEndData.rankings)?.map((player: any, index: number) => (
-                  <div key={index} className={`grid gap-1 px-3 py-2.5 border-t border-white/[0.04] text-xs text-center ${gameEndData.isGroup ? 'grid-cols-6' : 'grid-cols-5'} ${index === 0 ? 'bg-amber-500/[0.07]' : ''}`}>
-                    <div className={`font-medium text-center break-words leading-tight ${gameEndData.isGroup ? (player.isGroup1 ? 'text-sky-300' : 'text-violet-300') : 'text-white/80'}`}>
+                  <div key={index} className={`grid gap-1 px-3 py-2.5 border-t border-sep text-xs text-center ${gameEndData.isGroup ? 'grid-cols-6' : 'grid-cols-5'} ${index === 0 ? 'bg-[var(--warn-bg)]' : ''}`}>
+                    <div className={`font-medium text-center break-words leading-tight ${gameEndData.isGroup ? (player.isGroup1 ? 'text-ablue' : 'text-apurple') : 'text-l2'}`}>
                       {index === 0 ? '🏆 ' : `${index + 1}. `}{player.name}
                     </div>
-                    <div className={`self-center ${player.score > 0 ? 'text-red-400' : player.score < 0 ? 'text-emerald-400' : 'text-white/30'}`}>{player.score}</div>
-                    <div className={`self-center ${(player.stats?.totalOkey || 0) > 0 ? 'text-amber-400' : 'text-white/20'}`}>{player.stats?.totalOkey || 0}</div>
-                    <div className={`self-center ${((player.stats?.totalFinish || 0) + (player.stats?.totalHandFinish || 0)) > 0 ? 'text-emerald-400' : 'text-white/20'}`}>{(player.stats?.totalFinish || 0) + (player.stats?.totalHandFinish || 0)}</div>
-                    <div className={`self-center ${(player.stats?.totalIndividualPenalty || 0) > 0 ? 'text-orange-400' : 'text-white/20'}`}>{player.stats?.totalIndividualPenalty || 0}</div>
-                    {gameEndData.isGroup && <div className={`self-center ${(player.stats?.totalTeamPenalty || 0) > 0 ? 'text-red-400' : 'text-white/20'}`}>{player.stats?.totalTeamPenalty || 0}</div>}
+                    <div className={`self-center ${player.score > 0 ? 'text-ared' : player.score < 0 ? 'text-agreen' : 'text-l4'}`}>{player.score}</div>
+                    <div className={`self-center ${(player.stats?.totalOkey || 0) > 0 ? 'text-ayellow' : 'text-l4'}`}>{player.stats?.totalOkey || 0}</div>
+                    <div className={`self-center ${((player.stats?.totalFinish || 0) + (player.stats?.totalHandFinish || 0)) > 0 ? 'text-agreen' : 'text-l4'}`}>{(player.stats?.totalFinish || 0) + (player.stats?.totalHandFinish || 0)}</div>
+                    <div className={`self-center ${(player.stats?.totalIndividualPenalty || 0) > 0 ? 'text-aorange' : 'text-l4'}`}>{player.stats?.totalIndividualPenalty || 0}</div>
+                    {gameEndData.isGroup && <div className={`self-center ${(player.stats?.totalTeamPenalty || 0) > 0 ? 'text-ared' : 'text-l4'}`}>{player.stats?.totalTeamPenalty || 0}</div>}
                   </div>
                 ))}
               </div>
@@ -793,7 +803,7 @@ function GamePageContent() {
               <div className="space-y-2">
                 <button
                   onClick={() => { setShowGameEndModal(false); startNewGame(); }}
-                  className="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-black font-bold py-3.5 rounded-xl text-sm transition-all shadow-glow-green touch-manipulation"
+                  className="w-full bg-agreen hover:opacity-90 active:scale-[0.98] text-black font-bold py-3.5 rounded-xl text-sm transition-all touch-manipulation"
                 >
                   Yeni Oyun Başlat
                 </button>
@@ -804,7 +814,7 @@ function GamePageContent() {
                     localStorage.removeItem('currentGameId');
                     router.push('/');
                   }}
-                  className="w-full bg-white/[0.04] border border-white/[0.07] text-white/40 py-3 rounded-xl text-sm font-medium transition-colors active:scale-[0.97] touch-manipulation"
+                  className="w-full bg-s2 border border-sep text-l3 py-3 rounded-xl text-sm font-medium transition-colors active:scale-[0.97] touch-manipulation"
                 >
                   Kapat
                 </button>
@@ -820,8 +830,8 @@ function GamePageContent() {
 export default function GamePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center">
-        <div className="text-white/30 text-sm">Yükleniyor...</div>
+      <div className="min-h-screen bg-s0 flex items-center justify-center">
+        <div className="text-l3 text-sm">Yükleniyor...</div>
       </div>
     }>
       <GamePageContent />

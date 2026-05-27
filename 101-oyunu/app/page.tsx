@@ -3,13 +3,14 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
 const NAME_REGEX = /^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/;
 
-const inputBase = 'w-full px-4 py-3.5 bg-white/[0.06] border rounded-xl text-white text-base transition-colors';
+const inputBase = 'w-full px-4 py-3.5 bg-s2 border rounded-xl text-l1 text-base transition-colors';
 
 function HomeContent() {
   const router = useRouter();
@@ -104,16 +105,16 @@ function HomeContent() {
   ];
 
   const groupPlayerList = [
-    { value: player1, setter: setPlayer1, team: 'sky' as const, teamLabel: group1Name || '1. Takım', pos: 1 },
-    { value: player2, setter: setPlayer2, team: 'violet' as const, teamLabel: group2Name || '2. Takım', pos: 2 },
-    { value: player3, setter: setPlayer3, team: 'sky' as const, teamLabel: group1Name || '1. Takım', pos: 3 },
-    { value: player4, setter: setPlayer4, team: 'violet' as const, teamLabel: group2Name || '2. Takım', pos: 4 },
+    { value: player1, setter: setPlayer1, team: 'blue' as const, teamLabel: group1Name || '1. Takım', pos: 1 },
+    { value: player2, setter: setPlayer2, team: 'purple' as const, teamLabel: group2Name || '2. Takım', pos: 2 },
+    { value: player3, setter: setPlayer3, team: 'blue' as const, teamLabel: group1Name || '1. Takım', pos: 3 },
+    { value: player4, setter: setPlayer4, team: 'purple' as const, teamLabel: group2Name || '2. Takım', pos: 4 },
   ];
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center">
-        <div className="text-white/30 text-sm">Yükleniyor...</div>
+      <div className="min-h-screen bg-s0 flex items-center justify-center">
+        <div className="text-l3 text-sm">Yükleniyor...</div>
       </div>
     );
   }
@@ -121,21 +122,24 @@ function HomeContent() {
   /* ─── Misafir: oyun kurulum ekranı ─── */
   if (!user && gameMode !== null) {
     return (
-      <div className="min-h-screen bg-[#0f0f14] px-4 pt-6 pb-10">
+      <div className="min-h-screen bg-s0 px-4 pt-6 pb-10">
         <div className="max-w-sm mx-auto">
-          <button
-            onClick={() => setGameMode(null)}
-            className="flex items-center gap-1.5 text-white/35 text-sm mb-8 hover:text-white/55 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Geri
-          </button>
+          <div className="flex items-center justify-between mb-8">
+            <button
+              onClick={() => setGameMode(null)}
+              className="flex items-center gap-1.5 text-l3 text-sm hover:text-l2 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Geri
+            </button>
+            <ThemeToggle />
+          </div>
 
           <div className="mb-7">
-            <h2 className="text-2xl font-bold text-white">Oyuncular</h2>
-            <p className="text-white/35 text-sm mt-1">İlk dağıtacak oyuncuyu seç</p>
+            <h2 className="text-2xl font-bold text-l1">Oyuncular</h2>
+            <p className="text-l3 text-sm mt-1">İlk dağıtacak oyuncuyu seç</p>
           </div>
 
           <div className="space-y-2.5 mb-8">
@@ -146,7 +150,7 @@ function HomeContent() {
                   name="dealer"
                   checked={dealerIndex === idx}
                   onChange={() => setDealerIndex(idx)}
-                  className="w-4 h-4 accent-emerald-500 flex-shrink-0"
+                  className="w-4 h-4 accent-[rgb(var(--agreen-rgb))] flex-shrink-0"
                 />
                 <input
                   type="text"
@@ -154,7 +158,7 @@ function HomeContent() {
                   value={value}
                   onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setter(e.target.value); }}
                   maxLength={20}
-                  className={`${inputBase} border-white/[0.08]`}
+                  className={`${inputBase} border-sep`}
                 />
               </div>
             ))}
@@ -163,7 +167,7 @@ function HomeContent() {
           {hasOngoingGame && (
             <button
               onClick={handleReturnToGame}
-              className="w-full mb-3 py-3.5 border border-amber-500/25 bg-amber-500/10 text-amber-400 rounded-2xl font-semibold text-sm active:scale-[0.98] transition-all"
+              className="w-full mb-3 py-3.5 border border-[var(--warn-border)] bg-[var(--warn-bg)] text-ayellow rounded-2xl font-semibold text-sm active:scale-[0.98] transition-all"
             >
               Devam Eden Oyuna Dön
             </button>
@@ -174,8 +178,8 @@ function HomeContent() {
             disabled={!canStartGame()}
             className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98] ${
               canStartGame()
-                ? 'bg-emerald-500 text-black shadow-glow-green hover:bg-emerald-400'
-                : 'bg-white/[0.04] text-white/20 cursor-not-allowed border border-white/[0.06]'
+                ? 'bg-agreen text-black hover:opacity-90'
+                : 'bg-s2 text-l4 cursor-not-allowed border border-sep'
             }`}
           >
             Oyunu Başlat
@@ -188,21 +192,25 @@ function HomeContent() {
   /* ─── Misafir: hoş geldin ekranı ─── */
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center p-5">
+      <div className="min-h-screen bg-s0 flex items-center justify-center p-5">
         <div className="w-full max-w-sm">
+          <div className="flex justify-end mb-4">
+            <ThemeToggle />
+          </div>
+
           <div className="text-center mb-10">
-            <h1 className="text-7xl font-black text-white tracking-tight leading-none">101</h1>
-            <p className="text-white/25 text-xs mt-3 tracking-[0.25em] uppercase">Skor Takip</p>
+            <h1 className="text-7xl font-black text-l1 tracking-tight leading-none">101</h1>
+            <p className="text-l4 text-xs mt-3 tracking-[0.25em] uppercase">Skor Takip</p>
           </div>
 
           {hasOngoingGame && (
-            <div className="mb-5 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
-              <p className="text-amber-400/70 text-xs font-semibold uppercase tracking-wider mb-3">
+            <div className="mb-5 p-4 bg-[var(--warn-bg)] border border-[var(--warn-border)] rounded-2xl">
+              <p className="text-ayellow/70 text-xs font-semibold uppercase tracking-wider mb-3">
                 Devam eden oyun
               </p>
               <button
                 onClick={handleReturnToGame}
-                className="w-full bg-amber-500 text-black py-3 rounded-xl font-bold text-sm active:scale-[0.98] transition-transform"
+                className="w-full bg-ayellow text-black py-3 rounded-xl font-bold text-sm active:scale-[0.98] transition-transform"
               >
                 Kaldığım Yerden Devam Et
               </button>
@@ -212,32 +220,32 @@ function HomeContent() {
           <div className="space-y-3">
             <button
               onClick={() => setGameMode('single')}
-              className="w-full bg-emerald-500 text-black py-4 rounded-2xl font-bold text-base shadow-glow-green hover:bg-emerald-400 active:scale-[0.98] transition-all duration-150"
+              className="w-full bg-agreen text-black py-4 rounded-2xl font-bold text-base hover:opacity-90 active:scale-[0.98] transition-all duration-150"
             >
               Misafir Olarak Oyna
             </button>
 
             <div className="flex items-center gap-3 py-1">
-              <div className="h-px flex-1 bg-white/[0.06]" />
-              <span className="text-white/20 text-xs">veya</span>
-              <div className="h-px flex-1 bg-white/[0.06]" />
+              <div className="h-px flex-1 bg-sep" />
+              <span className="text-l4 text-xs">veya</span>
+              <div className="h-px flex-1 bg-sep" />
             </div>
 
             <Link
               href="/login"
-              className="block w-full py-3.5 bg-white/[0.05] border border-white/[0.08] text-white/70 rounded-2xl font-semibold text-sm text-center hover:bg-white/[0.08] active:scale-[0.98] transition-all"
+              className="block w-full py-3.5 bg-s2 border border-sep text-l2 rounded-2xl font-semibold text-sm text-center hover:opacity-90 active:scale-[0.98] transition-all"
             >
               Giriş Yap
             </Link>
             <Link
               href="/register"
-              className="block w-full py-3 border border-white/[0.06] text-white/35 rounded-2xl font-medium text-sm text-center hover:border-white/[0.1] hover:text-white/55 active:scale-[0.98] transition-all"
+              className="block w-full py-3 border border-sep text-l3 rounded-2xl font-medium text-sm text-center hover:text-l2 active:scale-[0.98] transition-all"
             >
               Hesap Oluştur
             </Link>
           </div>
 
-          <p className="text-center text-white/18 text-xs mt-8 leading-relaxed">
+          <p className="text-center text-l4 text-xs mt-8 leading-relaxed">
             Hesap oluşturarak geçmişi ve istatistikleri takip edebilirsin
           </p>
         </div>
@@ -247,30 +255,33 @@ function HomeContent() {
 
   /* ─── Giriş yapılmış kullanıcı ekranı ─── */
   return (
-    <div className="min-h-screen bg-[#0f0f14]">
+    <div className="min-h-screen bg-s0">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#0f0f14]/90 backdrop-blur-md border-b border-white/[0.05] px-4 py-3 flex items-center justify-between">
+      <div className="sticky top-0 z-10 bg-s0h backdrop-blur-md border-b border-sep px-4 py-3 flex items-center justify-between">
         <div className="min-w-0">
-          <p className="text-white/30 text-xs">Hoş geldiniz</p>
-          <p className="text-white/75 text-sm font-medium truncate max-w-[180px]">{user.email}</p>
+          <p className="text-l3 text-xs">Hoş geldiniz</p>
+          <p className="text-l2 text-sm font-medium truncate max-w-[180px]">{user.email}</p>
         </div>
-        <button
-          onClick={signOut}
-          className="text-white/35 text-xs px-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-lg"
-        >
-          Çıkış
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <button
+            onClick={signOut}
+            className="text-l3 text-xs px-3 py-1.5 bg-s2 border border-sep rounded-lg"
+          >
+            Çıkış
+          </button>
+        </div>
       </div>
 
       <div className="px-4 pb-10 max-w-sm mx-auto">
         <div className="mt-7 mb-6">
-          <h1 className="text-4xl font-black text-white tracking-tight">101 Oyunu</h1>
-          <p className="text-white/30 text-sm mt-1">Dijital skor takibi</p>
+          <h1 className="text-4xl font-black text-l1 tracking-tight">101 Oyunu</h1>
+          <p className="text-l3 text-sm mt-1">Dijital skor takibi</p>
         </div>
 
         {/* Oyun Modu */}
         <div className="mb-6">
-          <p className="text-white/35 text-xs font-semibold uppercase tracking-wider mb-3">Oyun Modu</p>
+          <p className="text-l3 text-xs font-semibold uppercase tracking-wider mb-3">Oyun Modu</p>
           <div className="grid grid-cols-2 gap-2">
             {(['single', 'group'] as const).map((mode) => (
               <button
@@ -279,9 +290,9 @@ function HomeContent() {
                 className={`py-4 rounded-2xl font-semibold text-sm border transition-all active:scale-[0.98] ${
                   gameMode === mode
                     ? mode === 'single'
-                      ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-400'
-                      : 'bg-sky-500/15 border-sky-500/35 text-sky-400'
-                    : 'bg-white/[0.03] border-white/[0.07] text-white/45 hover:bg-white/[0.06]'
+                      ? 'bg-[var(--success-bg)] border-[var(--success-border)] text-agreen'
+                      : 'bg-[var(--team1-bg)] border-[var(--team1-border)] text-ablue'
+                    : 'bg-s2 border-sep text-l3 hover:text-l2'
                 }`}
               >
                 <div className="text-xl mb-1">{mode === 'single' ? '🎯' : '👥'}</div>
@@ -294,14 +305,14 @@ function HomeContent() {
         {/* Takım İsimleri */}
         {gameMode === 'group' && (
           <div className="mb-6 space-y-2">
-            <p className="text-white/35 text-xs font-semibold uppercase tracking-wider">Takım İsimleri</p>
+            <p className="text-l3 text-xs font-semibold uppercase tracking-wider">Takım İsimleri</p>
             <input
               type="text"
               placeholder="1. Takım"
               value={group1Name}
               onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setGroup1Name(e.target.value); }}
               maxLength={20}
-              className={`${inputBase} border-sky-500/20`}
+              className={`${inputBase} border-[var(--team1-border)]`}
             />
             <input
               type="text"
@@ -309,7 +320,7 @@ function HomeContent() {
               value={group2Name}
               onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setGroup2Name(e.target.value); }}
               maxLength={20}
-              className={`${inputBase} border-violet-500/20`}
+              className={`${inputBase} border-[var(--team2-border)]`}
             />
           </div>
         )}
@@ -317,9 +328,9 @@ function HomeContent() {
         {/* Oyuncular */}
         {gameMode && (
           <div className="mb-7">
-            <p className="text-white/35 text-xs font-semibold uppercase tracking-wider mb-3">
+            <p className="text-l3 text-xs font-semibold uppercase tracking-wider mb-3">
               Oyuncular{' '}
-              <span className="text-white/20 normal-case font-normal">— ilk dağıtacağı seç</span>
+              <span className="text-l4 normal-case font-normal">— ilk dağıtacağı seç</span>
             </p>
             <div className="space-y-2">
               {gameMode === 'group'
@@ -330,11 +341,11 @@ function HomeContent() {
                         name="dealer"
                         checked={dealerIndex === idx}
                         onChange={() => setDealerIndex(idx)}
-                        className="w-4 h-4 accent-emerald-500 flex-shrink-0"
+                        className="w-4 h-4 accent-[rgb(var(--agreen-rgb))] flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
                         <div className={`text-[10px] font-semibold mb-1 ${
-                          team === 'sky' ? 'text-sky-500/60' : 'text-violet-500/60'
+                          team === 'blue' ? 'text-ablue/60' : 'text-apurple/60'
                         }`}>
                           {teamLabel}
                         </div>
@@ -345,7 +356,7 @@ function HomeContent() {
                           onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setter(e.target.value); }}
                           maxLength={20}
                           className={`${inputBase} ${
-                            team === 'sky' ? 'border-sky-500/20' : 'border-violet-500/20'
+                            team === 'blue' ? 'border-[var(--team1-border)]' : 'border-[var(--team2-border)]'
                           }`}
                         />
                       </div>
@@ -358,7 +369,7 @@ function HomeContent() {
                         name="dealer"
                         checked={dealerIndex === idx}
                         onChange={() => setDealerIndex(idx)}
-                        className="w-4 h-4 accent-emerald-500 flex-shrink-0"
+                        className="w-4 h-4 accent-[rgb(var(--agreen-rgb))] flex-shrink-0"
                       />
                       <input
                         type="text"
@@ -366,7 +377,7 @@ function HomeContent() {
                         value={value}
                         onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setter(e.target.value); }}
                         maxLength={20}
-                        className={`${inputBase} border-white/[0.08] flex-1`}
+                        className={`${inputBase} border-sep flex-1`}
                       />
                     </div>
                   ))}
@@ -377,7 +388,7 @@ function HomeContent() {
         {hasOngoingGame && (
           <button
             onClick={handleReturnToGame}
-            className="w-full mb-3 py-3.5 border border-amber-500/25 bg-amber-500/[0.08] text-amber-400 rounded-2xl font-semibold text-sm active:scale-[0.98] transition-all"
+            className="w-full mb-3 py-3.5 border border-[var(--warn-border)] bg-[var(--warn-bg)] text-ayellow rounded-2xl font-semibold text-sm active:scale-[0.98] transition-all"
           >
             Devam Eden Oyuna Dön
           </button>
@@ -388,15 +399,15 @@ function HomeContent() {
           disabled={!canStartGame()}
           className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98] ${
             canStartGame()
-              ? 'bg-emerald-500 text-black shadow-glow-green hover:bg-emerald-400'
-              : 'bg-white/[0.04] text-white/20 cursor-not-allowed border border-white/[0.05]'
+              ? 'bg-agreen text-black hover:opacity-90'
+              : 'bg-s2 text-l4 cursor-not-allowed border border-sep'
           }`}
         >
           Oyunu Başlat
         </button>
 
         {!gameMode && (
-          <p className="text-center text-white/18 text-xs mt-6 leading-relaxed px-2">
+          <p className="text-center text-l4 text-xs mt-6 leading-relaxed px-2">
             101 oyunu 4 kişiyle oynanır. Grup modunda karşılıklı oturan oyuncular takım olur.
           </p>
         )}
@@ -408,8 +419,8 @@ function HomeContent() {
 export default function Home() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center">
-        <div className="text-white/30 text-sm">Yükleniyor...</div>
+      <div className="min-h-screen bg-s0 flex items-center justify-center">
+        <div className="text-l3 text-sm">Yükleniyor...</div>
       </div>
     }>
       <HomeContent />
