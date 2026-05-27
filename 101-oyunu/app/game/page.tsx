@@ -88,9 +88,15 @@ function GamePageContent() {
 
       setGameData(data);
       
-      // localStorage'dan round detaylarını yükle (sadece bir kez)
       const storedDetails = JSON.parse(localStorage.getItem('roundDetails') || '[]');
-      setRoundDetails(storedDetails);
+      // Aynı round numarasından birden fazla varsa ilkini tut (çift submit koruması)
+      const uniqueDetails = storedDetails.filter((d: RoundDetail, i: number, arr: RoundDetail[]) =>
+        arr.findIndex((x: RoundDetail) => x.round === d.round) === i
+      );
+      if (uniqueDetails.length !== storedDetails.length) {
+        localStorage.setItem('roundDetails', JSON.stringify(uniqueDetails));
+      }
+      setRoundDetails(uniqueDetails);
 
       // Oyuncuları ve skorları ayarla
       let initialPlayers: Player[] = playerNames.map(name => ({ name, scores: [] as number[] }));
@@ -101,8 +107,8 @@ function GamePageContent() {
         const newScores = scores.split(',').map(s => parseInt(s));
         const roundNum = parseInt(round);
         
-        // Mevcut skorları storedDetails'dan al
-        storedDetails.forEach((detail: RoundDetail) => {
+        // Mevcut skorları uniqueDetails'dan al
+        uniqueDetails.forEach((detail: RoundDetail) => {
           if (detail.round <= roundNum) {
             detail.players.forEach((player, index) => {
               if (!initialPlayers[index].scores[detail.round - 1]) {
@@ -111,11 +117,11 @@ function GamePageContent() {
             });
           }
         });
-        
+
         nextRound = roundNum + 1;
       } else {
         // Sadece mevcut detaylardan skorları yükle
-        storedDetails.forEach((detail: RoundDetail) => {
+        uniqueDetails.forEach((detail: RoundDetail) => {
           detail.players.forEach((player, index) => {
             initialPlayers[index].scores[detail.round - 1] = player.total;
           });

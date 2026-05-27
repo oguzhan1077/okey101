@@ -34,6 +34,7 @@ function RoundPageContent() {
   const [gameData, setGameData] = useState<GameData | null>(null);
   const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
   const [inputValues, setInputValues] = useState<string[]>(['', '', '', '']);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     // URL parametrelerinden oyun verilerini al
@@ -315,7 +316,8 @@ function RoundPageContent() {
   }, [playerScores]);
 
   const handleSubmit = useCallback(async () => {
-    if (!gameData) return;
+    if (!gameData || submitting) return;
+    setSubmitting(true);
 
     // Tüm puanları hesapla
     const roundScores = playerScores.map((_, index) => getTotal(index));
@@ -382,7 +384,7 @@ function RoundPageContent() {
     }
 
     router.push(`/game?${params.toString()}`);
-  }, [gameData, playerScores, getTotal, router]);
+  }, [gameData, playerScores, getTotal, router, submitting]);
 
   if (!gameData) {
     return (
@@ -919,9 +921,14 @@ function RoundPageContent() {
         {/* Submit Button */}
         <button
           onClick={handleSubmit}
-          className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 px-6 rounded-xl font-semibold text-lg transition-colors shadow-lg hover:shadow-xl"
+          disabled={submitting}
+          className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-colors shadow-lg ${
+            submitting
+              ? 'bg-gray-600 cursor-not-allowed text-gray-400'
+              : 'bg-blue-600 hover:bg-blue-500 text-white hover:shadow-xl'
+          }`}
         >
-          Round'u Kaydet
+          {submitting ? 'Kaydediliyor...' : "Round'u Kaydet"}
         </button>
       </div>
     </div>
