@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense, useCallback } from 'react';
+import { useState, useEffect, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CheckCircleIcon, CircleIcon, TargetIcon } from '@/components/Icons';
@@ -66,11 +66,12 @@ function RoundPageContent() {
 
   const addPenalty = useCallback((playerIndex: number, type: 'individual' | 'team') => {
     if (!gameData) return;
+    const isGroup = gameData.gameMode === 'group';
     setPlayerScores(prev => prev.map((score, index) => {
       if (type === 'individual' && index === playerIndex) {
         const n = { ...score, individualPenalty: score.individualPenalty + 101 };
         n.penalty = n.individualPenalty + n.teamPenalty; return n;
-      } else if (type === 'team' && gameData.gameMode === 'group') {
+      } else if (type === 'team' && isGroup) {
         const isTeam1 = playerIndex === 0 || playerIndex === 2;
         if ((index === 0 || index === 2) === isTeam1) {
           const n = { ...score, teamPenalty: score.teamPenalty + 50.5 };
@@ -79,15 +80,16 @@ function RoundPageContent() {
       }
       return score;
     }));
-  }, [gameData]);
+  }, [gameData?.gameMode]);
 
   const removePenalty = useCallback((playerIndex: number, type: 'individual' | 'team') => {
     if (!gameData) return;
+    const isGroup = gameData.gameMode === 'group';
     setPlayerScores(prev => prev.map((score, index) => {
       if (type === 'individual' && index === playerIndex) {
         const n = { ...score, individualPenalty: Math.max(0, score.individualPenalty - 101) };
         n.penalty = n.individualPenalty + n.teamPenalty; return n;
-      } else if (type === 'team' && gameData.gameMode === 'group') {
+      } else if (type === 'team' && isGroup) {
         const isTeam1 = playerIndex === 0 || playerIndex === 2;
         if ((index === 0 || index === 2) === isTeam1) {
           const n = { ...score, teamPenalty: Math.max(0, score.teamPenalty - 50.5) };
@@ -96,7 +98,7 @@ function RoundPageContent() {
       }
       return score;
     }));
-  }, [gameData]);
+  }, [gameData?.gameMode]);
 
   const toggleOkey = useCallback((playerIndex: number, okeyNumber: 1 | 2) => {
     const okeyField = okeyNumber === 1 ? 'hasOkey1' : 'hasOkey2';
@@ -115,74 +117,64 @@ function RoundPageContent() {
     return -1;
   }, [gameData?.gameMode]);
 
-  const toggleFinished = (playerIndex: number) => {
-    setPlayerScores(prev => {
-      const wasFinished = prev[playerIndex].finished;
-      const newFinished = !wasFinished;
+  const toggleFinished = useCallback((playerIndex: number) => {
+    const wasFinished = playerScores[playerIndex].finished;
+    const newFinished = !wasFinished;
+    const ti = getTeammateIndex(playerIndex);
 
+    setPlayerScores(prev => {
       const newScores = prev.map((score, index) => {
-        if (index === playerIndex) {
+        if (index === playerIndex)
           return { ...score, finished: newFinished, handFinished: false, points: newFinished ? 0 : score.points };
-        } else if (!wasFinished) {
+        if (!wasFinished)
           return { ...score, finished: false, handFinished: false };
-        }
         return score;
       });
-
-      const newInputValues = [...inputValues];
-      if (newFinished) {
-        newInputValues[playerIndex] = '';
-        if (gameData?.gameMode === 'group') {
-          const ti = getTeammateIndex(playerIndex);
-          if (ti !== -1) {
-            newScores[ti] = { ...newScores[ti], points: 0 };
-            newInputValues[ti] = '';
-          }
-        }
-      }
-      setInputValues(newInputValues);
-
+      if (newFinished && gameData?.gameMode === 'group' && ti !== -1)
+        newScores[ti] = { ...newScores[ti], points: 0 };
       return newScores;
     });
-  };
 
-  const toggleHandFinished = (playerIndex: number) => {
+    if (newFinished) {
+      const newIV = [...inputValues];
+      newIV[playerIndex] = '';
+      if (gameData?.gameMode === 'group' && ti !== -1) newIV[ti] = '';
+      setInputValues(newIV);
+    }
+  }, [playerScores, gameData?.gameMode, getTeammateIndex, inputValues]);
+
+  const toggleHandFinished = useCallback((playerIndex: number) => {
     if (!gameData) return;
-    setPlayerScores(prev => {
-      const newHandFinished = !prev[playerIndex].handFinished;
-      const newScores = prev.map((score, index) => {
-        const resetScore = { ...score, handFinished: false, finished: false };
-        if (newHandFinished) {
-          if (gameData.gameMode === 'group') {
-            const ti = getTeammateIndex(playerIndex);
-            if (index === playerIndex) return { ...resetScore, points: -202, handFinished: true, finished: true };
-            else if (index === ti) return { ...resetScore, points: 0 };
-            else return { ...resetScore, points: 202, individualPenalty: 202, penalty: 202 };
-          } else {
-            if (index === playerIndex) return { ...resetScore, points: -202, handFinished: true, finished: true };
-            else return { ...resetScore, points: 202, individualPenalty: 202, penalty: 202 };
-          }
-        }
-        return resetScore;
-      });
-      if (newHandFinished) {
-        const newIV = ['', '', '', ''];
-        if (gameData.gameMode === 'group') {
-          const ti = getTeammateIndex(playerIndex);
-          newIV[playerIndex] = '-202';
-          if (ti !== -1) newIV[ti] = '0';
-          [0, 1, 2, 3].forEach(i => { if (i !== playerIndex && i !== ti) newIV[i] = '202'; });
-        } else {
-          newIV[playerIndex] = '-202';
-          [0, 1, 2, 3].forEach(i => { if (i !== playerIndex) newIV[i] = '202'; });
-        }
-        setInputValues(newIV);
-      } else {
-        setInputValues(['', '', '', '']);
+    const newHandFinished = !playerScores[playerIndex].handFinished;
+    const ti = getTeammateIndex(playerIndex);
+    const isGroup = gameData.gameMode === 'group';
+
+    setPlayerScores(prev => prev.map((score, index) => {
+      const reset = { ...score, handFinished: false, finished: false };
+      if (!newHandFinished) return reset;
+      if (isGroup) {
+        if (index === playerIndex) return { ...reset, points: -202, handFinished: true, finished: true };
+        if (index === ti) return { ...reset, points: 0 };
+        return { ...reset, points: 202, individualPenalty: 202, penalty: 202 };
       }
-      return newScores;
-    });
-  };
+      if (index === playerIndex) return { ...reset, points: -202, handFinished: true, finished: true };
+      return { ...reset, points: 202, individualPenalty: 202, penalty: 202 };
+    }));
+
+    if (newHandFinished) {
+      const newIV = ['', '', '', ''];
+      newIV[playerIndex] = '-202';
+      if (isGroup) {
+        if (ti !== -1) newIV[ti] = '0';
+        [0, 1, 2, 3].forEach(i => { if (i !== playerIndex && i !== ti) newIV[i] = '202'; });
+      } else {
+        [0, 1, 2, 3].forEach(i => { if (i !== playerIndex) newIV[i] = '202'; });
+      }
+      setInputValues(newIV);
+    } else {
+      setInputValues(['', '', '', '']);
+    }
+  }, [playerScores, gameData, getTeammateIndex]);
 
   const isPointInputDisabled = useCallback((playerIndex: number) => {
     if (playerScores[playerIndex]?.finished) return true;
@@ -247,12 +239,12 @@ function RoundPageContent() {
     router.push(`/game?${params.toString()}`);
   }, [gameData, playerScores, getTotal, router, submitting]);
 
-  const handlePointChange = (playerIndex: number, value: string) => {
+  const handlePointChange = useCallback((playerIndex: number, value: string) => {
     if (!/^-?\d*$/.test(value) || value.split('-').length > 2 || (value.includes('-') && value.indexOf('-') !== 0)) return;
     const newIV = [...inputValues]; newIV[playerIndex] = value; setInputValues(newIV);
     if (value === '' || value === '-') updatePlayerScore(playerIndex, 'points', 0);
     else { const n = parseInt(value); if (!isNaN(n) && n >= -999 && n <= 999) updatePlayerScore(playerIndex, 'points', n); }
-  };
+  }, [inputValues, updatePlayerScore]);
 
   const glassCard = 'bg-s1 border border-sep rounded-2xl';
 

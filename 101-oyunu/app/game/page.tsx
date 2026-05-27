@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense, useCallback } from 'react';
+import { useState, useEffect, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -86,9 +86,12 @@ function GamePageContent() {
       setGameData(data);
 
       const storedDetails = JSON.parse(localStorage.getItem('roundDetails') || '[]');
-      const uniqueDetails = storedDetails.filter((d: RoundDetail, i: number, arr: RoundDetail[]) =>
-        arr.findIndex((x: RoundDetail) => x.round === d.round) === i
-      );
+      const seen = new Set<number>();
+      const uniqueDetails = storedDetails.filter((d: RoundDetail) => {
+        if (seen.has(d.round)) return false;
+        seen.add(d.round);
+        return true;
+      });
       if (uniqueDetails.length !== storedDetails.length) {
         localStorage.setItem('roundDetails', JSON.stringify(uniqueDetails));
       }
@@ -144,22 +147,6 @@ function GamePageContent() {
 
   const calculateTotals = useCallback(() => { setShowCalculation(true); }, []);
 
-  const getTotalScore = useCallback((playerIndex: number) => {
-    let baseScore = players[playerIndex]?.scores.reduce((sum, score) => sum + score, 0) || 0;
-    if (gameData?.gameMode === 'group') {
-      const teammateIndex = getTeammateIndex(playerIndex);
-      roundDetails.forEach(round => {
-        const player = round.players[playerIndex];
-        const teammate = teammateIndex !== -1 ? round.players[teammateIndex] : null;
-        if (player && teammate) {
-          baseScore += player.teamPenalty / 2 + teammate.teamPenalty / 2;
-          baseScore -= player.teamPenalty;
-        }
-      });
-    }
-    return baseScore;
-  }, [players, gameData?.gameMode, roundDetails]);
-
   const getTeammateIndex = useCallback((playerIndex: number) => {
     if (!gameData || gameData.gameMode !== 'group') return -1;
     if (playerIndex === 0) return 2;
@@ -168,6 +155,25 @@ function GamePageContent() {
     if (playerIndex === 3) return 1;
     return -1;
   }, [gameData?.gameMode]);
+
+  // Tüm oyuncuların toplam skorları — veri değiştiğinde bir kez hesaplanır
+  const totalScores = useMemo(() => {
+    const isGroup = gameData?.gameMode === 'group';
+    return players.map((player, index) => {
+      let score = player.scores.reduce((sum, s) => sum + s, 0);
+      if (isGroup) {
+        const ti = index === 0 ? 2 : index === 2 ? 0 : index === 1 ? 3 : 1;
+        roundDetails.forEach(round => {
+          const p = round.players[index];
+          const t = round.players[ti];
+          if (p && t) score += p.teamPenalty / 2 + t.teamPenalty / 2 - p.teamPenalty;
+        });
+      }
+      return score;
+    });
+  }, [players, gameData?.gameMode, roundDetails]);
+
+  const getTotalScore = useCallback((playerIndex: number) => totalScores[playerIndex] ?? 0, [totalScores]);
 
   const getGroupScores = useCallback(() => {
     if (!gameData || gameData.gameMode !== 'group') return null;
@@ -810,7 +816,7 @@ function GamePageContent() {
                       <div key={ri} className="grid border-t border-sep px-4 py-3 gap-1 items-center" style={{gridTemplateColumns: cols}}>
                         <div className="text-[10px] text-l3 uppercase tracking-wide">{row.label}</div>
                         {allPlayers.map((p: any, i: number) => {
-                          const val = row.get(p, i);
+                          const val = row.get(p);
                           return (
                             <div key={i} className={`text-sm font-semibold text-center min-w-0 ${row.color(val)}`}>{val}</div>
                           );
