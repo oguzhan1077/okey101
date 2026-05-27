@@ -598,7 +598,7 @@ function GamePageContent() {
                           <div className={player.points < 0 ? 'text-agreen' : 'text-l1'}>{player.points || '—'}</div>
                           <div className={player.individualPenalty ? 'text-aorange' : 'text-l4'}>{player.individualPenalty || '—'}</div>
                           <div className={gameData?.gameMode === 'group' && player.teamPenalty ? 'text-l1' : 'text-l4'}>{(gameData?.gameMode === 'group' && player.teamPenalty) ? player.teamPenalty : '—'}</div>
-                          <div className={player.hasOkey1 || player.hasOkey2 ? 'text-aorange' : 'text-l4'}>{[player.hasOkey1 && '●', player.hasOkey2 && '●'].filter(Boolean).join(' ') || '—'}</div>
+                          <div className={player.hasOkey1 || player.hasOkey2 ? 'text-ablue' : 'text-l4'}>{[player.hasOkey1 && '●', player.hasOkey2 && '●'].filter(Boolean).join(' ') || '—'}</div>
                           <div className={player.finished ? 'text-agreen' : 'text-l4'}>{player.finished ? '✓' : '—'}</div>
                           <div className={`font-bold ${player.total < 0 ? 'text-agreen' : 'text-l1'}`}>{player.total}</div>
                         </div>
@@ -664,11 +664,11 @@ function GamePageContent() {
                       </div>
                       <div className="flex justify-center items-center gap-0.5">
                         <button onClick={() => updateEditPlayerData(index, 'hasOkey1', !player.hasOkey1)}
-                          className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors touch-manipulation ${player.hasOkey1 ? 'bg-aorange text-white' : 'bg-s2 border border-sep text-l3'}`}>
+                          className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors touch-manipulation ${player.hasOkey1 ? 'bg-ablue text-white' : 'bg-s2 border border-sep text-l3'}`}>
                           <svg className="w-2 h-2" viewBox="0 0 12 12" fill="currentColor"><circle cx="6" cy="6" r="5" /></svg>
                         </button>
                         <button onClick={() => updateEditPlayerData(index, 'hasOkey2', !player.hasOkey2)}
-                          className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors touch-manipulation ${player.hasOkey2 ? 'bg-aorange text-white' : 'bg-s2 border border-sep text-l3'}`}>
+                          className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors touch-manipulation ${player.hasOkey2 ? 'bg-ablue text-white' : 'bg-s2 border border-sep text-l3'}`}>
                           <svg className="w-2 h-2" viewBox="0 0 12 12" fill="currentColor"><circle cx="6" cy="6" r="5" /></svg>
                         </button>
                       </div>

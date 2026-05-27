@@ -400,7 +400,7 @@ function RoundPageContent() {
                         onClick={() => toggleOkey(pi, n)}
                         className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-[0.93] touch-manipulation ${
                           (n === 1 ? playerScores[pi]?.hasOkey1 : playerScores[pi]?.hasOkey2)
-                            ? 'bg-aorange text-white'
+                            ? 'bg-ablue text-white'
                             : 'bg-s2 border border-sep text-l3'
                         }`}
                       >
