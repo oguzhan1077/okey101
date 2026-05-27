@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useVenue } from '@/context/VenueContext';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +39,6 @@ function GamePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
-  const { venue } = useVenue();
   const [gameData, setGameData] = useState<GameData | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentRound, setCurrentRound] = useState(1);
@@ -387,12 +385,6 @@ function GamePageContent() {
       <div className="sticky top-0 z-10 bg-[#0f0f14]/90 backdrop-blur-md border-b border-white/[0.06]">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-base font-bold text-white">101 Oyunu</h1>
-          {venue && (
-            <div className="flex items-center gap-1.5 bg-white/[0.05] border border-white/[0.07] rounded-full px-3 py-1">
-              {venue.logo_url && <img src={venue.logo_url} alt={venue.name} className="h-3.5 w-3.5 object-contain" />}
-              <span className="text-white/50 text-xs">{venue.name}</span>
-            </div>
-          )}
         </div>
       </div>
 

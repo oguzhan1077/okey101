@@ -10,14 +10,12 @@ const supabase = createClient(
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { venue_id, game_mode, team1_name, team2_name } = body;
+    const { game_mode, team1_name, team2_name } = body;
 
-    // Sadece özet bilgileri kaydet
     const { data, error } = await supabase
       .from('games')
       .insert([
         {
-          venue_id: venue_id || null,
           game_mode,
           player_count: 4,
           team1_name: game_mode === 'group' ? team1_name : null,

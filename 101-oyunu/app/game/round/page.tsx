@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useVenue } from '@/context/VenueContext';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +28,6 @@ interface GameData {
 function RoundPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { venue } = useVenue();
   const [gameData, setGameData] = useState<GameData | null>(null);
   const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
   const [inputValues, setInputValues] = useState<string[]>(['', '', '', '']);
@@ -289,7 +287,6 @@ function RoundPageContent() {
           </button>
           <div className="flex-1 text-center">
             <h1 className="text-white font-bold text-base">Round {gameData.currentRound}</h1>
-            {venue && <div className="text-white/30 text-xs">{venue.name}</div>}
           </div>
           <div className="w-9" />
         </div>

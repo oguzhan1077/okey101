@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useVenue } from '@/context/VenueContext';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -16,9 +15,7 @@ function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading, signOut } = useAuth();
-  const { venue, setVenue } = useVenue();
   const [gameMode, setGameMode] = useState<'group' | 'single' | null>(null);
-  const [venueLoading, setVenueLoading] = useState(false);
   const [group1Name, setGroup1Name] = useState('');
   const [group2Name, setGroup2Name] = useState('');
   const [player1, setPlayer1] = useState('');
@@ -28,18 +25,6 @@ function HomeContent() {
   const [hasOngoingGame, setHasOngoingGame] = useState(false);
   const [ongoingGameData, setOngoingGameData] = useState<any>(null);
   const [dealerIndex, setDealerIndex] = useState<number>(0);
-
-  useEffect(() => {
-    const venueSlug = searchParams.get('venue');
-    if (venueSlug && !venue) {
-      setVenueLoading(true);
-      fetch(`/api/venues/${venueSlug}`)
-        .then(res => res.json())
-        .then(data => { if (!data.error) setVenue(data); })
-        .catch(error => console.error('Venue yükleme hatası:', error))
-        .finally(() => setVenueLoading(false));
-    }
-  }, [searchParams, venue, setVenue]);
 
   useEffect(() => {
     try {
@@ -85,7 +70,6 @@ function HomeContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          venue_id: venue?.id || null,
           game_mode: gameMode,
           team1_name: gameMode === 'group' ? group1Name : null,
           team2_name: gameMode === 'group' ? group2Name : null,
@@ -206,18 +190,6 @@ function HomeContent() {
     return (
       <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center p-5">
         <div className="w-full max-w-sm">
-          {venue && (
-            <div className="mb-8 text-center">
-              {venue.logo_url && (
-                <img src={venue.logo_url} alt={venue.name} className="h-12 mx-auto mb-2 object-contain" />
-              )}
-              <p className="text-white/45 text-sm font-medium">{venue.name}</p>
-              {venue.welcome_message && (
-                <p className="text-white/25 text-xs mt-1">{venue.welcome_message}</p>
-              )}
-            </div>
-          )}
-
           <div className="text-center mb-10">
             <h1 className="text-7xl font-black text-white tracking-tight leading-none">101</h1>
             <p className="text-white/25 text-xs mt-3 tracking-[0.25em] uppercase">Skor Takip</p>
@@ -291,20 +263,6 @@ function HomeContent() {
       </div>
 
       <div className="px-4 pb-10 max-w-sm mx-auto">
-        {venue && (
-          <div className="mt-4 p-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl flex items-center gap-3">
-            {venue.logo_url && (
-              <img src={venue.logo_url} alt={venue.name} className="h-8 w-8 object-contain rounded-lg" />
-            )}
-            <div className="min-w-0">
-              <p className="text-white/75 font-medium text-sm">{venue.name}</p>
-              {venue.welcome_message && (
-                <p className="text-white/30 text-xs truncate">{venue.welcome_message}</p>
-              )}
-            </div>
-          </div>
-        )}
-
         <div className="mt-7 mb-6">
           <h1 className="text-4xl font-black text-white tracking-tight">101 Oyunu</h1>
           <p className="text-white/30 text-sm mt-1">Dijital skor takibi</p>
