@@ -8,21 +8,21 @@
   --s0: #F2F2F7;
   --s0h: rgba(242,242,247,0.92);
   --s1: #FFFFFF;
-  --s2: rgba(120,120,128,0.12);
+  --s2: #EBEBF0;
   --s3: #E5E5EA;
   /* Labels */
-  --l1: #000000;
-  --l2: rgba(60,60,67,0.60);
-  --l3: rgba(60,60,67,0.30);
-  --l4: rgba(60,60,67,0.18);
-  --sep: rgba(60,60,67,0.18);
+  --l1: #1D1D1F;
+  --l2: #3C3C43;
+  --l3: #3C3C43;
+  --l4: #6D6D72;
+  --sep: #D1D1D6;
   /* Accent colors — RGB space for Tailwind opacity modifiers */
   --agreen-rgb: 52 199 89;
   --ablue-rgb: 0 122 255;
   --apurple-rgb: 175 82 222;
   --ared-rgb: 255 59 48;
   --aorange-rgb: 255 149 0;
-  --ayellow-rgb: 255 204 0;
+  --ayellow-rgb: 168 92 0;
   /* Status/team tint backgrounds */
   --team1-bg: rgba(0,122,255,0.08);
   --team1-border: rgba(0,122,255,0.18);
@@ -43,14 +43,14 @@ html.dark {
   --s0: #000000;
   --s0h: rgba(0,0,0,0.92);
   --s1: #1C1C1E;
-  --s2: rgba(118,118,128,0.24);
+  --s2: #2C2C2E;
   --s3: #3A3A3C;
   /* Labels */
-  --l1: #FFFFFF;
-  --l2: rgba(235,235,245,0.60);
-  --l3: rgba(235,235,245,0.30);
-  --l4: rgba(235,235,245,0.18);
-  --sep: rgba(84,84,88,0.65);
+  --l1: #F5F5F7;
+  --l2: #C7C7CC;
+  --l3: #C7C7CC;
+  --l4: #8E8E93;
+  --sep: #3A3A3C;
   /* Accent colors */
   --agreen-rgb: 48 209 88;
   --ablue-rgb: 10 132 255;

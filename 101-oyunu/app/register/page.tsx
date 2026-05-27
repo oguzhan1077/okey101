@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
+import { CheckCircleIcon } from '@/components/Icons'
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
@@ -50,15 +51,17 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
+      <div className="min-h-screen bg-s0 flex items-center justify-center p-4">
         <div className="max-w-md w-full">
-          <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-8 text-center">
-            <div className="text-6xl mb-4">✅</div>
-            <h1 className="text-2xl font-bold text-white mb-4">Kayıt Başarılı!</h1>
-            <p className="text-gray-300 mb-4">
+          <div className="bg-s1 border border-sep rounded-2xl shadow-2xl p-8 text-center">
+            <div className="flex justify-center mb-4">
+              <CheckCircleIcon className="w-16 h-16 text-agreen" />
+            </div>
+            <h1 className="text-2xl font-bold text-l1 mb-4">Kayıt Başarılı!</h1>
+            <p className="text-l2 text-sm mb-4">
               E-posta adresinizi kontrol edin ve hesabınızı doğrulayın.
             </p>
-            <p className="text-sm text-gray-400">Ana sayfaya yönlendiriliyorsunuz...</p>
+            <p className="text-sm text-l3">Ana sayfaya yönlendiriliyorsunuz...</p>
           </div>
         </div>
       </div>
@@ -66,26 +69,26 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
+    <div className="min-h-screen bg-s0 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-8">
+        <div className="bg-s1 border border-sep rounded-2xl shadow-2xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Kayıt Ol</h1>
-            <p className="text-gray-300">101 Oyunu hesabı oluşturun</p>
+            <h1 className="text-3xl font-bold text-l1 mb-2">Kayıt Ol</h1>
+            <p className="text-l2 text-sm">101 Oyunu hesabı oluşturun</p>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="mb-6 p-4 bg-red-900/50 border border-red-700 rounded-xl">
-              <p className="text-red-300 text-sm">{error}</p>
+            <div className="mb-6 p-4 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-xl">
+              <p className="text-ared text-sm">{error}</p>
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-l2 mb-2">
                 E-posta
               </label>
               <input
@@ -94,13 +97,13 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                className="w-full px-4 py-3 bg-s2 border border-sep rounded-xl text-l1 transition-colors"
                 placeholder="ornek@email.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-l2 mb-2">
                 Şifre
               </label>
               <input
@@ -110,13 +113,13 @@ export default function RegisterPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                className="w-full px-4 py-3 bg-s2 border border-sep rounded-xl text-l1 transition-colors"
                 placeholder="En az 6 karakter"
               />
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-l2 mb-2">
                 Şifre Tekrar
               </label>
               <input
@@ -125,7 +128,7 @@ export default function RegisterPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                className="w-full px-4 py-3 bg-s2 border border-sep rounded-xl text-l1 transition-colors"
                 placeholder="Şifrenizi tekrar girin"
               />
             </div>
@@ -133,7 +136,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:cursor-not-allowed text-white py-3 px-6 rounded-xl font-semibold transition-colors shadow-lg hover:shadow-xl"
+              className="w-full bg-ablue disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] hover:opacity-90"
             >
               {loading ? 'Kayıt yapılıyor...' : 'Kayıt Ol'}
             </button>
@@ -141,9 +144,9 @@ export default function RegisterPage() {
 
           {/* Login Link */}
           <div className="mt-6 text-center">
-            <p className="text-gray-400">
+            <p className="text-l3 text-sm">
               Zaten hesabınız var mı?{' '}
-              <Link href="/login" className="text-blue-400 hover:text-blue-300 font-medium">
+              <Link href="/login" className="text-ablue font-medium hover:opacity-80">
                 Giriş Yap
               </Link>
             </p>

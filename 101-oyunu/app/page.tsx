@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { PersonIcon, PeopleIcon } from '@/components/Icons';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -150,7 +151,7 @@ function HomeContent() {
                   name="dealer"
                   checked={dealerIndex === idx}
                   onChange={() => setDealerIndex(idx)}
-                  className="w-4 h-4 accent-[rgb(var(--agreen-rgb))] flex-shrink-0"
+                  className="w-4 h-4 accent-[rgb(var(--ablue-rgb))] flex-shrink-0"
                 />
                 <input
                   type="text"
@@ -178,7 +179,7 @@ function HomeContent() {
             disabled={!canStartGame()}
             className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98] ${
               canStartGame()
-                ? 'bg-agreen text-black hover:opacity-90'
+                ? 'bg-ablue text-white hover:opacity-90'
                 : 'bg-s2 text-l4 cursor-not-allowed border border-sep'
             }`}
           >
@@ -205,7 +206,7 @@ function HomeContent() {
 
           {hasOngoingGame && (
             <div className="mb-5 p-4 bg-[var(--warn-bg)] border border-[var(--warn-border)] rounded-2xl">
-              <p className="text-ayellow/70 text-xs font-semibold uppercase tracking-wider mb-3">
+              <p className="text-ayellow text-xs font-semibold uppercase tracking-wider mb-3">
                 Devam eden oyun
               </p>
               <button
@@ -220,7 +221,7 @@ function HomeContent() {
           <div className="space-y-3">
             <button
               onClick={() => setGameMode('single')}
-              className="w-full bg-agreen text-black py-4 rounded-2xl font-bold text-base hover:opacity-90 active:scale-[0.98] transition-all duration-150"
+              className="w-full bg-ablue text-white py-4 rounded-2xl font-bold text-base hover:opacity-90 active:scale-[0.98] transition-all duration-150"
             >
               Misafir Olarak Oyna
             </button>
@@ -295,7 +296,9 @@ function HomeContent() {
                     : 'bg-s2 border-sep text-l3 hover:text-l2'
                 }`}
               >
-                <div className="text-xl mb-1">{mode === 'single' ? '🎯' : '👥'}</div>
+                <div className="flex justify-center mb-1.5">
+                  {mode === 'single' ? <PersonIcon /> : <PeopleIcon />}
+                </div>
                 {mode === 'single' ? 'Tekli' : 'Grup'}
               </button>
             ))}
@@ -341,7 +344,7 @@ function HomeContent() {
                         name="dealer"
                         checked={dealerIndex === idx}
                         onChange={() => setDealerIndex(idx)}
-                        className="w-4 h-4 accent-[rgb(var(--agreen-rgb))] flex-shrink-0"
+                        className="w-4 h-4 accent-[rgb(var(--ablue-rgb))] flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
                         <div className={`text-[10px] font-semibold mb-1 ${
@@ -369,7 +372,7 @@ function HomeContent() {
                         name="dealer"
                         checked={dealerIndex === idx}
                         onChange={() => setDealerIndex(idx)}
-                        className="w-4 h-4 accent-[rgb(var(--agreen-rgb))] flex-shrink-0"
+                        className="w-4 h-4 accent-[rgb(var(--ablue-rgb))] flex-shrink-0"
                       />
                       <input
                         type="text"
@@ -399,7 +402,7 @@ function HomeContent() {
           disabled={!canStartGame()}
           className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98] ${
             canStartGame()
-              ? 'bg-agreen text-black hover:opacity-90'
+              ? 'bg-ablue text-white hover:opacity-90'
               : 'bg-s2 text-l4 cursor-not-allowed border border-sep'
           }`}
         >

@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { ChartIcon, FlagIcon, RefreshIcon, TrophyIcon, EqualIcon, CheckCircleIcon } from '@/components/Icons';
 
 export const dynamic = 'force-dynamic';
 
@@ -421,7 +422,7 @@ function GamePageContent() {
                     {player.name}
                   </div>
                   {gameData.gameMode === 'group' && (
-                    <div className={`text-[10px] mt-0.5 truncate ${isGroup1 ? 'text-ablue/50' : 'text-apurple/50'}`}>
+                    <div className={`text-[10px] mt-0.5 truncate ${isGroup1 ? 'text-ablue/70' : 'text-apurple/70'}`}>
                       {isGroup1 ? gameData.group1Name : gameData.group2Name}
                     </div>
                   )}
@@ -445,11 +446,11 @@ function GamePageContent() {
             return (
               <div className="grid grid-cols-2 gap-2 mt-3">
                 <div className="bg-[var(--team1-bg)] border border-[var(--team1-border)] rounded-xl px-3 py-2.5 text-center">
-                  <div className="text-ablue/70 text-[11px] font-medium truncate">{g.group1.name}</div>
+                  <div className="text-ablue text-[11px] font-medium truncate">{g.group1.name}</div>
                   <div className={`text-xl font-bold mt-0.5 ${g.group1.total > 0 ? 'text-ared' : 'text-agreen'}`}>{g.group1.total}</div>
                 </div>
                 <div className="bg-[var(--team2-bg)] border border-[var(--team2-border)] rounded-xl px-3 py-2.5 text-center">
-                  <div className="text-apurple/70 text-[11px] font-medium truncate">{g.group2.name}</div>
+                  <div className="text-apurple text-[11px] font-medium truncate">{g.group2.name}</div>
                   <div className={`text-xl font-bold mt-0.5 ${g.group2.total > 0 ? 'text-ared' : 'text-agreen'}`}>{g.group2.total}</div>
                 </div>
               </div>
@@ -490,7 +491,7 @@ function GamePageContent() {
                   const isGroup1 = idx === 0 || idx === 2;
                   return (
                     <div key={idx} className={`text-[10px] text-center font-medium truncate px-0.5 ${
-                      gameData.gameMode === 'group' ? (isGroup1 ? 'text-ablue/60' : 'text-apurple/60') : 'text-l3'
+                      gameData.gameMode === 'group' ? (isGroup1 ? 'text-ablue/80' : 'text-apurple/80') : 'text-l3'
                     }`}>
                       {player.name}
                     </div>
@@ -553,7 +554,7 @@ function GamePageContent() {
           </div>
           <button
             onClick={goToRoundPage}
-            className="w-full bg-agreen hover:opacity-90 active:scale-[0.98] text-black font-bold py-4 rounded-xl text-base transition-all touch-manipulation"
+            className="w-full bg-ablue hover:opacity-90 active:scale-[0.98] text-white font-bold py-4 rounded-xl text-base transition-all touch-manipulation"
           >
             + Yeni Round Ekle
           </button>
@@ -565,21 +566,21 @@ function GamePageContent() {
             onClick={() => { calculateTotals(); setSelectedRoundDetails(null); }}
             className="bg-s2 hover:opacity-90 active:scale-[0.97] border border-sep text-l2 py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
           >
-            <span className="text-lg">📊</span>
+            <ChartIcon />
             <span className="text-xs">Skorlar</span>
           </button>
           <button
             onClick={finishGame}
             className="bg-[var(--danger-bg)] hover:opacity-90 active:scale-[0.97] border border-[var(--danger-border)] text-ared py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
           >
-            <span className="text-lg">🏁</span>
+            <FlagIcon />
             <span className="text-xs">Bitir</span>
           </button>
           <button
             onClick={startNewGame}
             className="bg-s2 hover:opacity-90 active:scale-[0.97] border border-sep text-l3 py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
           >
-            <span className="text-lg">🎮</span>
+            <RefreshIcon />
             <span className="text-xs">Yeni Oyun</span>
           </button>
         </div>
@@ -617,7 +618,7 @@ function GamePageContent() {
                           <div className={player.points > 0 ? 'text-ared' : player.points < 0 ? 'text-agreen' : 'text-l4'}>{player.points || '—'}</div>
                           <div className={player.individualPenalty ? 'text-aorange' : 'text-l4'}>{player.individualPenalty || '—'}</div>
                           <div className={gameData?.gameMode === 'group' && player.teamPenalty ? 'text-ared' : 'text-l4'}>{(gameData?.gameMode === 'group' && player.teamPenalty) ? player.teamPenalty : '—'}</div>
-                          <div className={player.hasOkey1 || player.hasOkey2 ? 'text-ayellow' : 'text-l4'}>{[player.hasOkey1 && '⚪', player.hasOkey2 && '⚪'].filter(Boolean).join('') || '—'}</div>
+                          <div className={player.hasOkey1 || player.hasOkey2 ? 'text-aorange' : 'text-l4'}>{[player.hasOkey1 && '●', player.hasOkey2 && '●'].filter(Boolean).join(' ') || '—'}</div>
                           <div className={player.finished ? 'text-agreen' : 'text-l4'}>{player.finished ? '✓' : '—'}</div>
                           <div className={`font-bold ${player.total > 0 ? 'text-ared' : player.total < 0 ? 'text-agreen' : 'text-l3'}`}>{player.total}</div>
                         </div>
@@ -641,7 +642,7 @@ function GamePageContent() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-l1 font-semibold">Round {editRoundData.round} — Düzenle</h3>
                 <div className="flex gap-2">
-                  <button onClick={saveRoundEdit} className="bg-agreen active:scale-[0.96] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all touch-manipulation">
+                  <button onClick={saveRoundEdit} className="bg-ablue active:scale-[0.96] text-white font-bold px-4 py-2 rounded-xl text-sm transition-all touch-manipulation">
                     Kaydet
                   </button>
                   <button onClick={cancelRoundEdit} className="w-9 h-9 rounded-xl bg-s2 border border-sep text-l3 flex items-center justify-center transition-colors active:scale-[0.95] touch-manipulation">
@@ -688,9 +689,13 @@ function GamePageContent() {
                       </div>
                       <div className="flex justify-center items-center gap-0.5">
                         <button onClick={() => updateEditPlayerData(index, 'hasOkey1', !player.hasOkey1)}
-                          className={`w-5 h-5 rounded-full text-[10px] transition-colors touch-manipulation ${player.hasOkey1 ? 'bg-ayellow text-black' : 'bg-[var(--warn-bg)] border border-[var(--warn-border)] text-ayellow'}`}>⚪</button>
+                          className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors touch-manipulation ${player.hasOkey1 ? 'bg-aorange text-white' : 'bg-s2 border border-sep text-l3'}`}>
+                          <svg className="w-2 h-2" viewBox="0 0 12 12" fill="currentColor"><circle cx="6" cy="6" r="5" /></svg>
+                        </button>
                         <button onClick={() => updateEditPlayerData(index, 'hasOkey2', !player.hasOkey2)}
-                          className={`w-5 h-5 rounded-full text-[10px] transition-colors touch-manipulation ${player.hasOkey2 ? 'bg-ayellow text-black' : 'bg-[var(--warn-bg)] border border-[var(--warn-border)] text-ayellow'}`}>⚪</button>
+                          className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors touch-manipulation ${player.hasOkey2 ? 'bg-aorange text-white' : 'bg-s2 border border-sep text-l3'}`}>
+                          <svg className="w-2 h-2" viewBox="0 0 12 12" fill="currentColor"><circle cx="6" cy="6" r="5" /></svg>
+                        </button>
                       </div>
                       <div className="flex justify-center items-center">
                         <button onClick={() => updateEditPlayerData(index, 'finished', !player.finished)}
@@ -717,7 +722,11 @@ function GamePageContent() {
         <div className={modalBase}>
           <div className={modalCard}>
             <div className="p-6 text-center">
-              <div className="text-4xl mb-3">{confirmAction === 'finish' ? '🏁' : '🎮'}</div>
+              <div className="flex justify-center mb-3">
+                {confirmAction === 'finish'
+                  ? <FlagIcon className="w-10 h-10 text-ared" />
+                  : <RefreshIcon className="w-10 h-10 text-ablue" />}
+              </div>
               <h2 className="text-l1 font-bold text-lg mb-2">
                 {confirmAction === 'finish' ? 'Oyunu Bitir' : 'Yeni Oyun'}
               </h2>
@@ -727,7 +736,7 @@ function GamePageContent() {
                   : 'Mevcut oyun verileri silinecek. Devam etmek istiyor musunuz?'}
               </p>
               <div className="bg-[var(--warn-bg)] border border-[var(--warn-border)] rounded-xl px-4 py-2.5 mb-5">
-                <span className="text-ayellow/80 text-xs">
+                <span className="text-ayellow text-xs">
                   {confirmAction === 'finish' ? 'Bu işlem geri alınamaz!' : 'Tüm round verileri kaybolacak!'}
                 </span>
               </div>
@@ -740,7 +749,7 @@ function GamePageContent() {
                   className={`py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] touch-manipulation ${
                     confirmAction === 'finish'
                       ? 'bg-[var(--danger-bg)] border border-[var(--danger-border)] text-ared hover:opacity-90'
-                      : 'bg-agreen hover:opacity-90 text-black'
+                      : 'bg-ablue hover:opacity-90 text-white'
                   }`}>
                   {confirmAction === 'finish' ? 'Evet, Bitir' : 'Evet, Başlat'}
                 </button>
@@ -756,15 +765,19 @@ function GamePageContent() {
           <div className={`${modalCard} max-w-lg`}>
             <div className="p-6">
               <div className="text-center mb-5">
-                <div className="text-4xl mb-2">{gameEndData.winnerType === 'tie' ? '🤝' : '🏆'}</div>
+                <div className="flex justify-center mb-2">
+                  {gameEndData.winnerType === 'tie'
+                    ? <EqualIcon className="w-10 h-10 text-ablue" />
+                    : <TrophyIcon className="w-10 h-10 text-ayellow" />}
+                </div>
                 <h2 className="text-l1 font-bold text-lg">{gameEndData.winnerType === 'tie' ? 'Berabere!' : 'Oyun Bitti!'}</h2>
               </div>
 
               <div className="bg-[var(--warn-bg)] border border-[var(--warn-border)] rounded-xl px-4 py-3 text-center mb-4">
-                <div className="text-ayellow/60 text-xs mb-1">{gameEndData.winnerType === 'tie' ? 'Sonuç' : 'Kazanan'}</div>
+                <div className="text-ayellow/90 text-xs mb-1">{gameEndData.winnerType === 'tie' ? 'Sonuç' : 'Kazanan'}</div>
                 <div className="text-ayellow font-bold text-lg">{gameEndData.winner}</div>
                 {gameEndData.winnerType === 'single' && gameEndData.winnerScore !== undefined && (
-                  <div className="text-ayellow/50 text-xs mt-0.5">{gameEndData.winnerScore} puan</div>
+                  <div className="text-ayellow/80 text-xs mt-0.5">{gameEndData.winnerScore} puan</div>
                 )}
               </div>
 
@@ -789,10 +802,10 @@ function GamePageContent() {
                 {(gameEndData.playersWithStats || gameEndData.rankings)?.map((player: any, index: number) => (
                   <div key={index} className={`grid gap-1 px-3 py-2.5 border-t border-sep text-xs text-center ${gameEndData.isGroup ? 'grid-cols-6' : 'grid-cols-5'} ${index === 0 ? 'bg-[var(--warn-bg)]' : ''}`}>
                     <div className={`font-medium text-center break-words leading-tight ${gameEndData.isGroup ? (player.isGroup1 ? 'text-ablue' : 'text-apurple') : 'text-l2'}`}>
-                      {index === 0 ? '🏆 ' : `${index + 1}. `}{player.name}
+                      <span className={index === 0 ? 'text-ayellow' : ''}>{index + 1}.</span> {player.name}
                     </div>
                     <div className={`self-center ${player.score > 0 ? 'text-ared' : player.score < 0 ? 'text-agreen' : 'text-l4'}`}>{player.score}</div>
-                    <div className={`self-center ${(player.stats?.totalOkey || 0) > 0 ? 'text-ayellow' : 'text-l4'}`}>{player.stats?.totalOkey || 0}</div>
+                    <div className={`self-center ${(player.stats?.totalOkey || 0) > 0 ? 'text-aorange' : 'text-l4'}`}>{player.stats?.totalOkey || 0}</div>
                     <div className={`self-center ${((player.stats?.totalFinish || 0) + (player.stats?.totalHandFinish || 0)) > 0 ? 'text-agreen' : 'text-l4'}`}>{(player.stats?.totalFinish || 0) + (player.stats?.totalHandFinish || 0)}</div>
                     <div className={`self-center ${(player.stats?.totalIndividualPenalty || 0) > 0 ? 'text-aorange' : 'text-l4'}`}>{player.stats?.totalIndividualPenalty || 0}</div>
                     {gameEndData.isGroup && <div className={`self-center ${(player.stats?.totalTeamPenalty || 0) > 0 ? 'text-ared' : 'text-l4'}`}>{player.stats?.totalTeamPenalty || 0}</div>}
@@ -803,7 +816,7 @@ function GamePageContent() {
               <div className="space-y-2">
                 <button
                   onClick={() => { setShowGameEndModal(false); startNewGame(); }}
-                  className="w-full bg-agreen hover:opacity-90 active:scale-[0.98] text-black font-bold py-3.5 rounded-xl text-sm transition-all touch-manipulation"
+                  className="w-full bg-ablue hover:opacity-90 active:scale-[0.98] text-white font-bold py-3.5 rounded-xl text-sm transition-all touch-manipulation"
                 >
                   Yeni Oyun Başlat
                 </button>

@@ -31,26 +31,26 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
+    <div className="min-h-screen bg-s0 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-8">
+        <div className="bg-s1 border border-sep rounded-2xl shadow-2xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Giriş Yap</h1>
-            <p className="text-gray-300">101 Oyunu'na hoş geldiniz</p>
+            <h1 className="text-3xl font-bold text-l1 mb-2">Giriş Yap</h1>
+            <p className="text-l2 text-sm">101 Oyunu'na hoş geldiniz</p>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="mb-6 p-4 bg-red-900/50 border border-red-700 rounded-xl">
-              <p className="text-red-300 text-sm">{error}</p>
+            <div className="mb-6 p-4 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-xl">
+              <p className="text-ared text-sm">{error}</p>
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-l2 mb-2">
                 E-posta
               </label>
               <input
@@ -59,13 +59,13 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                className="w-full px-4 py-3 bg-s2 border border-sep rounded-xl text-l1 transition-colors"
                 placeholder="ornek@email.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-l2 mb-2">
                 Şifre
               </label>
               <input
@@ -74,7 +74,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                className="w-full px-4 py-3 bg-s2 border border-sep rounded-xl text-l1 transition-colors"
                 placeholder="••••••••"
               />
             </div>
@@ -82,7 +82,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white py-3 px-6 rounded-xl font-semibold transition-colors shadow-lg hover:shadow-xl"
+              className="w-full bg-ablue disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] hover:opacity-90"
             >
               {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
             </button>
@@ -90,9 +90,9 @@ export default function LoginPage() {
 
           {/* Register Link */}
           <div className="mt-6 text-center">
-            <p className="text-gray-400">
+            <p className="text-l3 text-sm">
               Hesabınız yok mu?{' '}
-              <Link href="/register" className="text-blue-400 hover:text-blue-300 font-medium">
+              <Link href="/register" className="text-ablue font-medium hover:opacity-80">
                 Kayıt Ol
               </Link>
             </p>
