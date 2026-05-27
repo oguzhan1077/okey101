@@ -482,18 +482,18 @@ function GamePageContent() {
             </div>
           ) : (
             <div>
-              <div className="grid grid-cols-6 gap-1 px-3 py-2 bg-s2">
+              <div className="grid gap-1 px-3 py-2 bg-s2" style={{gridTemplateColumns:'1.5rem 1fr 1fr 1fr 1fr 2rem'}}>
                 <div className="text-l4 text-[10px] text-center">#</div>
                 {displayOrder.map((idx, colIdx) => (
                   <div key={idx} className={`text-[10px] text-center font-medium truncate px-0.5 text-l3 ${isGroupMode && colIdx === 2 ? 'border-l border-sep' : ''}`}>
                     {players[idx].name}
                   </div>
                 ))}
-                <div className="text-l4 text-[10px] text-center"></div>
+                <div />
               </div>
 
               {players[0].scores.map((_, roundIndex) => (
-                <div key={roundIndex} className="grid grid-cols-6 gap-1 px-3 py-2 border-t border-sep hover:bg-s2 transition-colors">
+                <div key={roundIndex} className="grid gap-1 px-3 py-2 border-t border-sep hover:bg-s2 transition-colors" style={{gridTemplateColumns:'1.5rem 1fr 1fr 1fr 1fr 2rem'}}>
                   <div className="text-l3 text-xs text-center self-center">{roundIndex + 1}</div>
                   {displayOrder.map((playerIndex, colIdx) => {
                     const score = players[playerIndex].scores[roundIndex];
@@ -505,30 +505,19 @@ function GamePageContent() {
                       </div>
                     );
                   })}
-                  <div className="flex items-center justify-center gap-1">
-                    <button
-                      onClick={() => {
-                        setSelectedRoundDetails(selectedRoundDetails === roundIndex ? null : roundIndex);
-                        setShowCalculation(false);
-                        setIsEditMode(false);
-                      }}
-                      className="w-6 h-6 rounded-md bg-[var(--team1-bg)] border border-[var(--team1-border)] text-ablue flex items-center justify-center transition-colors active:scale-[0.93] touch-manipulation"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    </button>
+                  <div className="flex items-center justify-end">
                     <button
                       onClick={() => {
                         startEditRound(roundIndex);
                         setSelectedRoundDetails(null);
                         setShowCalculation(false);
                       }}
-                      className="w-6 h-6 rounded-md bg-[var(--warn-bg)] border border-[var(--warn-border)] text-ayellow flex items-center justify-center transition-colors active:scale-[0.93] touch-manipulation"
+                      className="w-6 h-6 rounded-full bg-[var(--team1-bg)] border border-[var(--team1-border)] text-ablue flex items-center justify-center transition-colors active:scale-[0.93] touch-manipulation"
                     >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="5" cy="12" r="2" />
+                        <circle cx="12" cy="12" r="2" />
+                        <circle cx="19" cy="12" r="2" />
                       </svg>
                     </button>
                   </div>
@@ -556,10 +545,10 @@ function GamePageContent() {
         <div className="grid grid-cols-3 gap-2 pb-4">
           <button
             onClick={() => { calculateTotals(); setSelectedRoundDetails(null); }}
-            className="bg-s2 hover:opacity-90 active:scale-[0.97] border border-sep text-l2 py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
+            className="bg-s2 hover:opacity-90 active:scale-[0.97] border border-sep py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
           >
-            <ChartIcon />
-            <span className="text-xs">Skorlar</span>
+            <ChartIcon className="w-5 h-5 text-ablue" />
+            <span className="text-xs text-l2">Skorlar</span>
           </button>
           <button
             onClick={finishGame}
@@ -570,10 +559,10 @@ function GamePageContent() {
           </button>
           <button
             onClick={startNewGame}
-            className="bg-s2 hover:opacity-90 active:scale-[0.97] border border-sep text-l3 py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
+            className="bg-s2 hover:opacity-90 active:scale-[0.97] border border-sep py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
           >
-            <RefreshIcon />
-            <span className="text-xs">Yeni Oyun</span>
+            <RefreshIcon className="w-5 h-5 text-ablue" />
+            <span className="text-xs text-l3">Yeni Oyun</span>
           </button>
         </div>
       </div>
