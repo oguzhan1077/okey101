@@ -485,7 +485,7 @@ function GamePageContent() {
               <div className="grid gap-1 px-3 py-2 bg-s2" style={{gridTemplateColumns:'1.5rem 1fr 1fr 1fr 1fr 2rem'}}>
                 <div className="text-l4 text-[10px] text-center">#</div>
                 {displayOrder.map((idx, colIdx) => (
-                  <div key={idx} className={`text-[10px] text-center font-medium truncate px-0.5 text-l3 ${isGroupMode && colIdx === 2 ? 'border-l border-sep' : ''}`}>
+                  <div key={idx} className={`text-[10px] text-center font-medium truncate px-0.5 text-l3 min-w-0 ${isGroupMode && colIdx === 2 ? 'border-l border-sep' : ''}`}>
                     {players[idx].name}
                   </div>
                 ))}
@@ -774,11 +774,13 @@ function GamePageContent() {
               {(() => {
                 const allPlayers = gameEndData.playersWithStats || gameEndData.rankings || [];
                 const cols = `3rem repeat(${allPlayers.length}, 1fr)`;
+                const totalRounds = players[0]?.scores.length || 0;
                 const rows = [
-                  { label: 'Puan',  get: (p: any) => p.score,                                                            color: (v: number) => v < 0 ? 'text-agreen' : 'text-l1' },
-                  { label: 'Okey',  get: (p: any) => p.stats?.totalOkey || 0,                                            color: (v: number) => v > 0 ? 'text-l1' : 'text-l4' },
-                  { label: 'Bitiş', get: (p: any) => (p.stats?.totalFinish || 0) + (p.stats?.totalHandFinish || 0),      color: (v: number) => v > 0 ? 'text-agreen' : 'text-l4' },
-                  { label: 'Ceza',  get: (p: any) => p.stats?.totalIndividualPenalty || 0,                               color: (v: number) => v > 0 ? 'text-l1' : 'text-l4' },
+                  { label: 'Puan',  get: (p: any) => p.score,                                                            color: (v: any) => v < 0 ? 'text-agreen' : 'text-l1' },
+                  { label: '*RBP',  get: (p: any) => totalRounds > 0 ? (p.score / totalRounds).toFixed(1) : '—',         color: (v: any) => parseFloat(v) < 0 ? 'text-agreen' : 'text-l1' },
+                  { label: 'Okey',  get: (p: any) => p.stats?.totalOkey || 0,                                            color: (v: any) => v > 0 ? 'text-l1' : 'text-l4' },
+                  { label: 'Bitiş', get: (p: any) => (p.stats?.totalFinish || 0) + (p.stats?.totalHandFinish || 0),      color: (v: any) => v > 0 ? 'text-agreen' : 'text-l4' },
+                  { label: 'Ceza',  get: (p: any) => p.stats?.totalIndividualPenalty || 0,                               color: (v: any) => v > 0 ? 'text-l1' : 'text-l4' },
                 ];
                 return (
                   <div className="rounded-2xl overflow-hidden border border-sep mb-5">
@@ -786,7 +788,7 @@ function GamePageContent() {
                     <div className="grid bg-s2 px-4 py-2 gap-1" style={{gridTemplateColumns: cols}}>
                       <div />
                       {allPlayers.map((p: any, i: number) => (
-                        <div key={i} className="text-center">
+                        <div key={i} className="text-center min-w-0">
                           <div className="text-[11px] font-semibold text-l3 mb-0.5">{i + 1}.</div>
                           <div className="text-[10px] font-semibold text-l2 truncate">{p.name}</div>
                         </div>
@@ -799,7 +801,7 @@ function GamePageContent() {
                         {allPlayers.map((p: any, i: number) => {
                           const val = row.get(p, i);
                           return (
-                            <div key={i} className={`text-sm font-semibold text-center ${row.color(val)}`}>{val}</div>
+                            <div key={i} className={`text-sm font-semibold text-center min-w-0 ${row.color(val)}`}>{val}</div>
                           );
                         })}
                       </div>
@@ -807,6 +809,8 @@ function GamePageContent() {
                   </div>
                 );
               })()}
+
+              <p className="text-[10px] text-l4 -mt-3 mb-5">* RBP: Round Başına Puan</p>
 
               {/* Butonlar */}
               <div className="space-y-2">
