@@ -315,6 +315,7 @@ function GamePageContent() {
       })),
     );
     endData.skillScores = Object.fromEntries(skillResults.map(s => [s.name, s.totalSkillScore]));
+    endData.skillDetails = skillResults;
 
     // Modalı hemen aç, API kaydını arka planda yap
     setGameEndData(endData);
@@ -1215,7 +1216,7 @@ function GamePageContent() {
                   { label: 'Okey', get: (p: any) => p.stats?.totalOkey || 0, color: (v: any) => v > 0 ? 'text-l1' : 'text-l4' },
                   { label: 'Bitiş', get: (p: any) => (p.stats?.totalFinish || 0) + (p.stats?.totalHandFinish || 0), color: (v: any) => v > 0 ? 'text-agreen' : 'text-l4' },
                   { label: 'Ceza', get: (p: any) => p.stats?.totalIndividualPenalty || 0, color: (v: any) => v > 0 ? 'text-l1' : 'text-l4' },
-                  { label: '†Skill', get: (p: any) => gameEndData.skillScores?.[p.name] ?? '—', color: (v: any) => typeof v === 'number' ? (v > 0 ? 'text-agreen' : v < 0 ? 'text-ared' : 'text-l3') : 'text-l4' },
+                  { label: 'SKILL', get: (p: any) => { const v = gameEndData.skillScores?.[p.name]; return typeof v === 'number' ? (v > 0 ? `+${v}` : `${v}`) : '—'; }, color: (v: any) => typeof v === 'string' && v !== '—' ? (v.startsWith('+') ? 'text-agreen' : v.startsWith('-') ? 'text-ared' : 'text-l3') : 'text-l4' },
                 ];
                 return (
                   <div className="rounded-2xl overflow-hidden border border-sep mb-5">
@@ -1241,7 +1242,7 @@ function GamePageContent() {
                 );
               })()}
 
-              <p className="text-[10px] text-l4 -mt-3 mb-5">* RBP: Round Başına Puan &nbsp;·&nbsp; † Skill: Beceri Puanı (okey ve bireysel ceza ağırlıklı)</p>
+              <p className="text-[10px] text-l4 -mt-3 mb-5">* RBP: Round Başına Puan &nbsp;·&nbsp; SKILL: Beceri Puanı (okey katsayısı ×0.30, bireysel ceza −75 puan)</p>
 
               <div className="space-y-2">
                 <button
