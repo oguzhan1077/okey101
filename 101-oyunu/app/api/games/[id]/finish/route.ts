@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,7 +15,12 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { winner_name, winner_type, user_id, game_statistics, user_won } = body;
+    const { winner_name, winner_type, game_statistics, user_won } = body;
+
+    // Kullanıcı kimliğini session'dan doğrula, client'tan gelen user_id'yi kullanma
+    const serverClient = await createSupabaseServerClient();
+    const { data: { user } } = await serverClient.auth.getUser();
+    const user_id = user?.id ?? null;
 
     // Önce oyunun zaten bitip bitmediğini kontrol et
     const { data: existingGame } = await supabase

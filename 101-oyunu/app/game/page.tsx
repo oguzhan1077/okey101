@@ -314,7 +314,7 @@ function GamePageContent() {
       if (gameId) {
         const gameStats = calculateGameStatistics(roundDetails, gameData!);
         const requestBody: any = { winner_name: endData.winner, winner_type: endData.winnerType };
-        if (user) { requestBody.user_id = user.id; requestBody.game_statistics = gameStats; requestBody.user_won = false; }
+        if (user) { requestBody.game_statistics = gameStats; requestBody.user_won = false; }
         await fetch(`/api/games/${gameId}/finish`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
         localStorage.removeItem('currentGameId');
       }
