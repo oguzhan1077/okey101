@@ -683,7 +683,7 @@ function GamePageContent() {
                         disabled={isDisabled}
                         onChange={(e) => { if (!isDisabled) handlePointChange(pi, e.target.value); }}
                         className={`w-full px-1 py-3 border rounded-xl text-center text-sm font-semibold transition-colors placeholder:text-l4 placeholder:font-normal ${isDisabled ? 'bg-s2 border-sep text-l4 cursor-not-allowed' : 'bg-s2 border-sep text-l1'}`}
-                        placeholder="—" maxLength={4}
+                        placeholder="-" maxLength={4}
                       />
                     );
                   })}
