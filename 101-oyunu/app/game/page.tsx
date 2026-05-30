@@ -324,6 +324,10 @@ function GamePageContent() {
     const gameId = localStorage.getItem('currentGameId');
     if (gameId) {
       const gameStats = calculateGameStatistics(roundDetails, gameData!);
+      gameStats.players = gameStats.players.map((p: any) => ({
+        ...p,
+        skill_score: endData.skillScores?.[p.name] ?? null,
+      }));
       const requestBody: any = { winner_name: endData.winner, winner_type: endData.winnerType };
       if (user) { requestBody.game_statistics = gameStats; requestBody.user_won = false; }
       fetch(`/api/games/${gameId}/finish`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) })
