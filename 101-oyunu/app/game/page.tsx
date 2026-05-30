@@ -7,8 +7,6 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { ChartIcon, FlagIcon, RefreshIcon, TrophyIcon, EqualIcon, CheckCircleIcon } from '@/components/Icons';
 import { Logo } from '@/components/Logo';
 
-export const dynamic = 'force-dynamic';
-
 interface Player {
   name: string;
   scores: number[];

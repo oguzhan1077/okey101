@@ -8,8 +8,6 @@ import { PersonIcon, PeopleIcon, LogoutIcon } from '@/components/Icons';
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 
-export const dynamic = 'force-dynamic';
-
 const NAME_REGEX = /^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/;
 
 const inputBase = 'w-full px-4 py-3.5 bg-s2 border rounded-xl text-l1 text-base transition-colors';
@@ -29,6 +27,7 @@ function HomeContent() {
   const [ongoingGameData, setOngoingGameData] = useState<any>(null);
   const [dealerIndex, setDealerIndex] = useState<number>(0)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
 
   useEffect(() => {
     try {
@@ -67,27 +66,10 @@ function HomeContent() {
     return false;
   };
 
-  const handleStartGame = async () => {
-    if (!canStartGame()) return;
-    try {
-      const response = await fetch('/api/games', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          game_mode: gameMode,
-          team1_name: gameMode === 'group' ? group1Name : null,
-          team2_name: gameMode === 'group' ? group2Name : null,
-        }),
-      });
-      const game = await response.json();
-      if (!response.ok) {
-        console.error('Oyun kaydı oluşturulamadı:', game.error);
-      } else {
-        localStorage.setItem('currentGameId', game.id);
-      }
-    } catch (error) {
-      console.error('Oyun kaydı hatası:', error);
-    }
+  const handleStartGame = () => {
+    if (!canStartGame() || isStarting) return;
+    setIsStarting(true);
+
     const params = new URLSearchParams({
       mode: gameMode!,
       player1, player2, player3, player4,
@@ -97,7 +79,26 @@ function HomeContent() {
       params.append('group1', group1Name);
       params.append('group2', group2Name);
     }
+
+    // Hemen navigate et, API kaydını arka planda yap
     router.push(`/game?${params.toString()}`);
+
+    fetch('/api/games', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        game_mode: gameMode,
+        team1_name: gameMode === 'group' ? group1Name : null,
+        team2_name: gameMode === 'group' ? group2Name : null,
+      }),
+    }).then(async (response) => {
+      if (response.ok) {
+        const game = await response.json();
+        localStorage.setItem('currentGameId', game.id);
+      }
+    }).catch((error) => {
+      console.error('Oyun kaydı hatası:', error);
+    });
   };
 
   const playerList = [
@@ -178,14 +179,14 @@ function HomeContent() {
 
           <button
             onClick={handleStartGame}
-            disabled={!canStartGame()}
+            disabled={!canStartGame() || isStarting}
             className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98] ${
-              canStartGame()
+              canStartGame() && !isStarting
                 ? 'bg-ablue text-white hover:opacity-90'
                 : 'bg-s2 text-l4 cursor-not-allowed border border-sep'
             }`}
           >
-            Oyunu Başlat
+            {isStarting ? 'Başlatılıyor...' : 'Oyunu Başlat'}
           </button>
         </div>
       </div>
@@ -401,14 +402,14 @@ function HomeContent() {
 
         <button
           onClick={handleStartGame}
-          disabled={!canStartGame()}
+          disabled={!canStartGame() || isStarting}
           className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98] ${
-            canStartGame()
+            canStartGame() && !isStarting
               ? 'bg-ablue text-white hover:opacity-90'
               : 'bg-s2 text-l4 cursor-not-allowed border border-sep'
           }`}
         >
-          Oyunu Başlat
+          {isStarting ? 'Başlatılıyor...' : 'Oyunu Başlat'}
         </button>
 
         {!gameMode && (

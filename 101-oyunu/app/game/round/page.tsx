@@ -5,8 +5,6 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CheckCircleIcon, CircleIcon, TargetIcon } from '@/components/Icons';
 
-export const dynamic = 'force-dynamic';
-
 interface PlayerScore {
   points: number;
   penalty: number;
