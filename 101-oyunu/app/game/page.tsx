@@ -271,7 +271,7 @@ function GamePageContent() {
       });
       return { name: playerName, total_score: totalScore, okey_count: okeyCount, penalty_count: penaltyCount, finished_count: finishedCount, individual_penalty: individualPenaltyTotal, team_penalty: teamPenaltyTotal };
     });
-    let totalOkeys = 0, totalPenalties = 0, totalFinishedHands = 0, highestRoundScore = 0, lowestRoundScore = 0;
+    let totalOkeys = 0, totalPenalties = 0, totalFinishedHands = 0, highestRoundScore = 0, lowestRoundScore = Infinity;
     rounds.forEach(round => {
       round.players.forEach(p => {
         if (p.hasOkey1) totalOkeys++;
@@ -279,9 +279,10 @@ function GamePageContent() {
         if (p.penalty > 0) totalPenalties++;
         if (p.finished || p.handFinished) totalFinishedHands++;
         if (p.total > highestRoundScore) highestRoundScore = p.total;
-        if (p.total < lowestRoundScore || lowestRoundScore === 0) lowestRoundScore = p.total;
+        if (p.total < lowestRoundScore) lowestRoundScore = p.total;
       });
     });
+    if (lowestRoundScore === Infinity) lowestRoundScore = 0;
     const team1TotalScore = game.gameMode === 'group' ? playerStats[0].total_score + playerStats[2].total_score : 0;
     const team2TotalScore = game.gameMode === 'group' ? playerStats[1].total_score + playerStats[3].total_score : 0;
     return { players: playerStats, total_okeys: totalOkeys, total_penalties: totalPenalties, total_finished_hands: totalFinishedHands, highest_round_score: highestRoundScore, lowest_round_score: lowestRoundScore, team1_total_score: team1TotalScore, team2_total_score: team2TotalScore };
@@ -468,7 +469,7 @@ function GamePageContent() {
     const ti = getTeammateIndex(playerIndex);
     const isGroup = gameData.gameMode === 'group';
     setPlayerScores(prev => prev.map((score, index) => {
-      const reset = { ...score, handFinished: false, finished: false };
+      const reset = { ...score, points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0, handFinished: false, finished: false };
       if (!newHandFinished) return reset;
       if (isGroup) {
         if (index === playerIndex) return { ...reset, points: -202, handFinished: true, finished: true };
