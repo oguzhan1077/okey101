@@ -1058,7 +1058,8 @@ function GamePageContent() {
                 <div className="grid grid-cols-6 gap-1 px-2 py-1.5 bg-s2 rounded-lg text-[10px] text-l3 text-center">
                   <div>İsim</div><div>Puan</div><div>Ceza</div><div>Okey</div><div>Bitti</div><div>Toplam</div>
                 </div>
-                {editRoundData.players.map((player, index) => {
+                {displayOrder.map((index) => {
+                  const player = editRoundData.players[index];
                   const inputCls = 'w-full px-1 py-1.5 bg-s2 border border-sep rounded-lg text-l1 text-center text-xs';
                   return (
                     <div key={index} className="grid grid-cols-6 gap-1 px-2 py-2 rounded-lg bg-s2">
