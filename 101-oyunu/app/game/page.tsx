@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { ChartIcon, FlagIcon, RefreshIcon, TrophyIcon, EqualIcon, CheckCircleIcon, CircleIcon, TargetIcon } from '@/components/Icons';
 import { Logo } from '@/components/Logo';
+import { calculateGameSkillScores } from '@/lib/skillScore';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -301,6 +302,20 @@ function GamePageContent() {
       endData.winnerScore = sortedPlayers[0].score;
       endData.scoreFark = sortedPlayers.length > 1 ? Math.abs(sortedPlayers[0].score - sortedPlayers[1].score) : 0;
     }
+    // Skill skorlarını hesapla ve endData'ya ekle
+    const skillResults = calculateGameSkillScores(
+      roundDetails.map(rd => ({
+        players: rd.players.map(p => ({
+          name: p.name,
+          total: p.total,
+          individualPenalty: p.individualPenalty,
+          hasOkey1: p.hasOkey1,
+          hasOkey2: p.hasOkey2,
+        })),
+      })),
+    );
+    endData.skillScores = Object.fromEntries(skillResults.map(s => [s.name, s.totalSkillScore]));
+
     // Modalı hemen aç, API kaydını arka planda yap
     setGameEndData(endData);
     setShowGameEndModal(true);
@@ -1196,6 +1211,7 @@ function GamePageContent() {
                   { label: 'Okey', get: (p: any) => p.stats?.totalOkey || 0, color: (v: any) => v > 0 ? 'text-l1' : 'text-l4' },
                   { label: 'Bitiş', get: (p: any) => (p.stats?.totalFinish || 0) + (p.stats?.totalHandFinish || 0), color: (v: any) => v > 0 ? 'text-agreen' : 'text-l4' },
                   { label: 'Ceza', get: (p: any) => p.stats?.totalIndividualPenalty || 0, color: (v: any) => v > 0 ? 'text-l1' : 'text-l4' },
+                  { label: '†Skill', get: (p: any) => gameEndData.skillScores?.[p.name] ?? '—', color: (v: any) => typeof v === 'number' ? (v > 0 ? 'text-agreen' : v < 0 ? 'text-ared' : 'text-l3') : 'text-l4' },
                 ];
                 return (
                   <div className="rounded-2xl overflow-hidden border border-sep mb-5">
@@ -1221,7 +1237,7 @@ function GamePageContent() {
                 );
               })()}
 
-              <p className="text-[10px] text-l4 -mt-3 mb-5">* RBP: Round Başına Puan</p>
+              <p className="text-[10px] text-l4 -mt-3 mb-5">* RBP: Round Başına Puan &nbsp;·&nbsp; † Skill: Beceri Puanı (okey ve bireysel ceza ağırlıklı)</p>
 
               <div className="space-y-2">
                 <button
