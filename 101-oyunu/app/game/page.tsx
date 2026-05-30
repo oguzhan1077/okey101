@@ -1016,7 +1016,7 @@ function GamePageContent() {
                     <div className="grid grid-cols-7 gap-1 px-2 py-1.5 bg-s2 rounded-lg text-[10px] text-l3 text-center">
                       <div>İsim</div><div>Puan</div><div>B.Ceza</div><div>T.Ceza</div><div>Okey</div><div>Bitti</div><div>Toplam</div>
                     </div>
-                    {detail.players.map((player, index) => (
+                    {displayOrder.map((index) => { const player = detail.players[index]; return (
                       <div key={index} className="grid grid-cols-7 gap-1 px-2 py-2.5 rounded-lg text-xs text-center bg-s2">
                         <div className="font-medium truncate text-l2">{player.name}</div>
                         <div className={player.points < 0 ? 'text-agreen' : 'text-l1'}>{player.points || '—'}</div>
@@ -1026,7 +1026,7 @@ function GamePageContent() {
                         <div className={player.finished ? 'text-agreen' : 'text-l4'}>{player.finished ? '✓' : '—'}</div>
                         <div className={`font-bold ${player.total < 0 ? 'text-agreen' : 'text-l1'}`}>{player.total}</div>
                       </div>
-                    ))}
+                    ); })}
                   </div>
                 ) : (
                   <div className="text-l3 text-center py-8">Detay bulunamadı</div>
