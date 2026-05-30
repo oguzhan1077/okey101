@@ -169,21 +169,10 @@ function GamePageContent() {
     return -1;
   }, [gameData?.gameMode]);
 
-  const totalScores = useMemo(() => {
-    const isGroup = gameData?.gameMode === 'group';
-    return players.map((player, index) => {
-      let score = player.scores.reduce((sum, s) => sum + s, 0);
-      if (isGroup) {
-        const ti = index === 0 ? 2 : index === 2 ? 0 : index === 1 ? 3 : 1;
-        roundDetails.forEach(round => {
-          const p = round.players[index];
-          const t = round.players[ti];
-          if (p && t) score += p.teamPenalty / 2 + t.teamPenalty / 2 - p.teamPenalty;
-        });
-      }
-      return score;
-    });
-  }, [players, gameData?.gameMode, roundDetails]);
+  const totalScores = useMemo(
+    () => players.map(player => player.scores.reduce((sum, s) => sum + s, 0)),
+    [players],
+  );
 
   const getTotalScore = useCallback((playerIndex: number) => totalScores[playerIndex] ?? 0, [totalScores]);
 
@@ -370,6 +359,10 @@ function GamePageContent() {
     const updatedPlayers = editRoundData.players.map((player, index) => {
       if (index === playerIndex) {
         const up = { ...player, [field]: value };
+        if (field === 'penalty') {
+          up.individualPenalty = value;
+          up.teamPenalty = 0;
+        }
         let total = up.points + up.penalty;
         if (up.finished && !up.handFinished) total -= 101;
         up.total = total;
