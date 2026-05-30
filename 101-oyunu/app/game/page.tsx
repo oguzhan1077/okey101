@@ -87,6 +87,7 @@ function GamePageContent() {
   // Round girişi state
   const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
   const [inputValues, setInputValues] = useState<string[]>(['', '', '', '']);
+  const [isHandFinish, setIsHandFinish] = useState(false);
 
   // ── Başlangıç ────────────────────────────────────────────────────────────────
 
@@ -234,6 +235,7 @@ function GamePageContent() {
   const goToRoundView = useCallback(() => {
     if (!gameData) return;
     setShowCalculation(false);
+    setIsHandFinish(false);
     setPlayerScores(Array(4).fill(null).map(() => ({
       points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0,
       hasOkey1: false, hasOkey2: false, finished: false, handFinished: false,
@@ -446,53 +448,67 @@ function GamePageContent() {
     const wasFinished = playerScores[playerIndex].finished;
     const newFinished = !wasFinished;
     const ti = getTeammateIndex(playerIndex);
-    setPlayerScores(prev => {
-      const newScores = prev.map((score, index) => {
-        if (index === playerIndex) return { ...score, finished: newFinished, handFinished: false, points: newFinished ? 0 : score.points };
-        if (!wasFinished) return { ...score, finished: false, handFinished: false };
-        return score;
-      });
-      if (newFinished && gameData?.gameMode === 'group' && ti !== -1) newScores[ti] = { ...newScores[ti], points: 0 };
-      return newScores;
-    });
-    if (newFinished) {
-      const newIV = [...inputValues];
-      newIV[playerIndex] = '';
-      if (gameData?.gameMode === 'group' && ti !== -1) newIV[ti] = '';
-      setInputValues(newIV);
-    }
-  }, [playerScores, gameData?.gameMode, getTeammateIndex, inputValues]);
+    const isGroup = gameData?.gameMode === 'group';
 
-  const toggleHandFinished = useCallback((playerIndex: number) => {
-    if (!gameData) return;
-    const newHandFinished = !playerScores[playerIndex].handFinished;
-    const ti = getTeammateIndex(playerIndex);
-    const isGroup = gameData.gameMode === 'group';
-    setPlayerScores(prev => prev.map((score, index) => {
-      const reset = { ...score, points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0, handFinished: false, finished: false };
-      if (!newHandFinished) return reset;
-      if (isGroup) {
-        if (index === playerIndex) return { ...reset, points: -202, handFinished: true, finished: true };
-        if (index === ti) return { ...reset, points: 0 };
-        return { ...reset, points: 202, individualPenalty: 202, penalty: 202 };
-      }
-      if (index === playerIndex) return { ...reset, points: -202, handFinished: true, finished: true };
-      return { ...reset, points: 202, individualPenalty: 202, penalty: 202 };
-    }));
-    if (newHandFinished) {
-      const newIV = ['', '', '', ''];
-      newIV[playerIndex] = '-202';
-      if (isGroup) {
-        if (ti !== -1) newIV[ti] = '0';
-        [0, 1, 2, 3].forEach(i => { if (i !== playerIndex && i !== ti) newIV[i] = '202'; });
+    if (isHandFinish) {
+      if (newFinished) {
+        // Elden bitirme uygula
+        setPlayerScores(prev => prev.map((score, index) => {
+          const base = { ...score, points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0, finished: false, handFinished: false };
+          if (isGroup) {
+            if (index === playerIndex) return { ...base, points: -202, handFinished: true, finished: true };
+            if (index === ti) return { ...base, points: 0 };
+            return { ...base, points: 202, individualPenalty: 202, penalty: 202 };
+          }
+          if (index === playerIndex) return { ...base, points: -202, handFinished: true, finished: true };
+          return { ...base, points: 202, individualPenalty: 202, penalty: 202 };
+        }));
+        const newIV = ['', '', '', ''];
+        newIV[playerIndex] = '-202';
+        if (isGroup) {
+          if (ti !== -1) newIV[ti] = '0';
+          [0, 1, 2, 3].forEach(i => { if (i !== playerIndex && i !== ti) newIV[i] = '202'; });
+        } else {
+          [0, 1, 2, 3].forEach(i => { if (i !== playerIndex) newIV[i] = '202'; });
+        }
+        setInputValues(newIV);
       } else {
-        [0, 1, 2, 3].forEach(i => { if (i !== playerIndex) newIV[i] = '202'; });
+        // Elden bitirmeyi geri al
+        setPlayerScores(prev => prev.map(score => ({
+          ...score, points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0, finished: false, handFinished: false,
+        })));
+        setInputValues(['', '', '', '']);
       }
-      setInputValues(newIV);
     } else {
+      // Normal bitirme
+      setPlayerScores(prev => {
+        const newScores = prev.map((score, index) => {
+          if (index === playerIndex) return { ...score, finished: newFinished, handFinished: false, points: newFinished ? 0 : score.points };
+          if (!wasFinished) return { ...score, finished: false, handFinished: false };
+          return score;
+        });
+        if (newFinished && isGroup && ti !== -1) newScores[ti] = { ...newScores[ti], points: 0 };
+        return newScores;
+      });
+      if (newFinished) {
+        const newIV = [...inputValues];
+        newIV[playerIndex] = '';
+        if (isGroup && ti !== -1) newIV[ti] = '';
+        setInputValues(newIV);
+      }
+    }
+  }, [playerScores, gameData?.gameMode, getTeammateIndex, inputValues, isHandFinish]);
+
+  const toggleIsHandFinish = useCallback(() => {
+    const hasFinisher = playerScores.some(s => s.finished);
+    if (hasFinisher) {
+      setPlayerScores(prev => prev.map(score => ({
+        ...score, points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0, finished: false, handFinished: false,
+      })));
       setInputValues(['', '', '', '']);
     }
-  }, [playerScores, gameData, getTeammateIndex]);
+    setIsHandFinish(prev => !prev);
+  }, [playerScores]);
 
   const isPointInputDisabled = useCallback((playerIndex: number) => {
     if (playerScores[playerIndex]?.finished) return true;
@@ -728,54 +744,53 @@ function GamePageContent() {
 
           {/* Oyunu Bitiren */}
           <div className={`${glassCard} p-4`}>
-            <div className="mb-3">
-              <h3 className="text-l2 font-semibold text-sm">Oyunu Bitiren</h3>
-              <p className="text-l3 text-xs mt-0.5">−101 puan · Sadece 1 oyuncu</p>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="text-l2 font-semibold text-sm">Oyunu Bitiren</h3>
+                <p className="text-l3 text-xs mt-0.5">
+                  {isHandFinish
+                    ? `−202 puan · ${isGroupMode ? 'Karşı takıma +404' : 'Diğerlerine +404'}`
+                    : '−101 puan · Sadece 1 oyuncu'}
+                </p>
+              </div>
+              <button
+                onClick={toggleIsHandFinish}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all touch-manipulation active:scale-[0.95] ${
+                  isHandFinish
+                    ? 'bg-ablue text-white'
+                    : 'bg-s2 border border-sep text-l3'
+                }`}
+              >
+                <TargetIcon className="w-3.5 h-3.5" />
+                Elden
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {displayOrder.map((pi) => (
-                <button key={pi} onClick={() => toggleFinished(pi)}
-                  disabled={playerScores.some(s => s.handFinished)}
-                  className={`py-3.5 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-between touch-manipulation active:scale-[0.97] ${
-                    playerScores[pi]?.finished && !playerScores[pi]?.handFinished
-                      ? 'bg-[var(--success-bg)] border-2 border-[var(--success-border)] text-agreen'
-                      : playerScores.some(s => s.handFinished) ? 'bg-s2 border border-sep text-l4 cursor-not-allowed'
-                      : 'bg-s2 border border-sep text-l2'
-                  }`}>
-                  <span>{gameData.players[pi]}</span>
-                  {playerScores[pi]?.finished && !playerScores[pi]?.handFinished
-                    ? <CheckCircleIcon className="w-5 h-5" />
-                    : <CircleIcon className="w-5 h-5" />}
-                </button>
-              ))}
+              {displayOrder.map((pi) => {
+                const isSelected = playerScores[pi]?.finished;
+                const isHand = playerScores[pi]?.handFinished;
+                return (
+                  <button key={pi} onClick={() => toggleFinished(pi)}
+                    className={`py-3.5 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-between touch-manipulation active:scale-[0.97] ${
+                      isSelected && isHand
+                        ? 'bg-[var(--team1-bg)] border-2 border-[var(--team1-border)] text-ablue'
+                        : isSelected
+                        ? 'bg-[var(--success-bg)] border-2 border-[var(--success-border)] text-agreen'
+                        : 'bg-s2 border border-sep text-l2'
+                    }`}>
+                    <span>{gameData.players[pi]}</span>
+                    {isSelected && isHand
+                      ? <TargetIcon className="w-5 h-5" />
+                      : isSelected
+                      ? <CheckCircleIcon className="w-5 h-5" />
+                      : <CircleIcon className="w-5 h-5" />}
+                  </button>
+                );
+              })}
             </div>
-            {isGroupMode && <p className="text-l3 text-xs mt-3">Grup modunda takım arkadaşının puanı otomatik 0 olur</p>}
-          </div>
-
-          {/* Elden Bitiren */}
-          <div className={`${glassCard} p-4`}>
-            <div className="mb-3">
-              <h3 className="text-l1 font-semibold text-sm">Elden Bitiren</h3>
-              <p className="text-l3 text-xs mt-0.5">
-                −202 puan · {isGroupMode ? 'Karşı takıma +404 puan' : 'Diğer oyunculara +404 puan'}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {displayOrder.map((pi) => (
-                <button key={pi} onClick={() => toggleHandFinished(pi)}
-                  disabled={playerScores.some(s => s.finished && !s.handFinished)}
-                  className={`py-3.5 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-between touch-manipulation active:scale-[0.97] ${
-                    playerScores[pi]?.handFinished
-                      ? 'bg-[var(--team1-bg)] border-2 border-[var(--team1-border)] text-ablue'
-                      : playerScores.some(s => s.finished && !s.handFinished) ? 'bg-s2 border border-sep text-l4 cursor-not-allowed'
-                      : 'bg-s2 border border-sep text-l2'
-                  }`}>
-                  <span>{gameData.players[pi]}</span>
-                  {playerScores[pi]?.handFinished ? <TargetIcon className="w-5 h-5" /> : <CircleIcon className="w-5 h-5" />}
-                </button>
-              ))}
-            </div>
-            <p className="text-l3 text-xs mt-3">Tüm puanlar otomatik hesaplanır</p>
+            {isGroupMode && !isHandFinish && (
+              <p className="text-l3 text-xs mt-3">Grup modunda takım arkadaşının puanı otomatik 0 olur</p>
+            )}
           </div>
         </div>
 
