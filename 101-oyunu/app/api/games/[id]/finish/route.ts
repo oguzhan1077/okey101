@@ -67,9 +67,6 @@ export async function PATCH(
 
     // Bağımsız işlemleri paralel çalıştır
     await Promise.allSettled([
-      data.venue_id
-        ? updateVenueStatistics(data.venue_id, data.game_mode, data.total_rounds)
-        : Promise.resolve(),
       user_id && game_statistics
         ? saveGameStatistics(id, user_id, game_statistics)
         : Promise.resolve(),
@@ -85,49 +82,6 @@ export async function PATCH(
       { error: 'Internal server error' },
       { status: 500 }
     );
-  }
-}
-
-// Venue istatistiklerini güncelle
-async function updateVenueStatistics(
-  venueId: string,
-  gameMode: string,
-  totalRounds: number
-) {
-  try {
-    // Mevcut istatistikleri getir
-    const { data: stats } = await supabase
-      .from('venue_statistics')
-      .select('*')
-      .eq('venue_id', venueId)
-      .single();
-
-    if (stats) {
-      // Güncelle
-      await supabase
-        .from('venue_statistics')
-        .update({
-          total_games: (stats.total_games || 0) + 1,
-          total_rounds: (stats.total_rounds || 0) + totalRounds,
-          most_played_mode: gameMode,
-          last_game_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('venue_id', venueId);
-    } else {
-      // İlk kez oluştur
-      await supabase.from('venue_statistics').insert([
-        {
-          venue_id: venueId,
-          total_games: 1,
-          total_rounds: totalRounds,
-          most_played_mode: gameMode,
-          last_game_at: new Date().toISOString(),
-        },
-      ]);
-    }
-  } catch (error) {
-    console.error('Error updating venue statistics:', error);
   }
 }
 
