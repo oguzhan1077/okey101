@@ -57,6 +57,8 @@ function GamePageContent() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'finish' | 'newGame' | null>(null);
 
+  useEffect(() => { router.prefetch('/game/round'); }, [router]);
+
   useEffect(() => {
     const mode = searchParams.get('mode') as 'group' | 'single';
     const group1 = searchParams.get('group1');

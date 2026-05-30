@@ -29,6 +29,8 @@ function HomeContent() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
+  useEffect(() => { router.prefetch('/game'); }, [router]);
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem('roundDetails');

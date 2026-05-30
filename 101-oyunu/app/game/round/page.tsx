@@ -33,6 +33,8 @@ function RoundPageContent() {
   const [inputValues, setInputValues] = useState<string[]>(['', '', '', '']);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => { router.prefetch('/game'); }, [router]);
+
   useEffect(() => {
     const mode = searchParams.get('mode') as 'group' | 'single';
     const group1 = searchParams.get('group1');
