@@ -65,20 +65,18 @@ export async function PATCH(
       );
     }
 
-    // İstatistikleri güncelle (varsa venue_id)
-    if (data.venue_id) {
-      await updateVenueStatistics(data.venue_id, data.game_mode, data.total_rounds);
-    }
-
-    // Detaylı oyun istatistiklerini kaydet (sadece üye kullanıcılar için)
-    if (user_id && game_statistics) {
-      await saveGameStatistics(id, user_id, game_statistics);
-    }
-
-    // Kullanıcı profilini güncelle (varsa)
-    if (user_id) {
-      await updateUserProfile(user_id, data.game_mode, user_won === true, data.total_rounds);
-    }
+    // Bağımsız işlemleri paralel çalıştır
+    await Promise.allSettled([
+      data.venue_id
+        ? updateVenueStatistics(data.venue_id, data.game_mode, data.total_rounds)
+        : Promise.resolve(),
+      user_id && game_statistics
+        ? saveGameStatistics(id, user_id, game_statistics)
+        : Promise.resolve(),
+      user_id
+        ? updateUserProfile(user_id, data.game_mode, user_won === true, data.total_rounds)
+        : Promise.resolve(),
+    ]);
 
     return NextResponse.json(data);
   } catch (error) {
