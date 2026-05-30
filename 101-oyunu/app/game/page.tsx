@@ -779,10 +779,13 @@ function GamePageContent() {
               </div>
               <button
                 onClick={toggleIsHandFinish}
+                disabled={!playerScores.some(s => s.finished)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all touch-manipulation active:scale-[0.95] ${
                   isHandFinish
                     ? 'bg-ablue text-white'
-                    : 'bg-s2 border border-sep text-l3'
+                    : playerScores.some(s => s.finished)
+                    ? 'bg-s2 border border-sep text-l3'
+                    : 'bg-s2 border border-sep text-l4 opacity-40 cursor-not-allowed'
                 }`}
               >
                 <TargetIcon className="w-3.5 h-3.5" />
