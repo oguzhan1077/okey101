@@ -279,7 +279,7 @@ function GamePageContent() {
     return { players: playerStats, total_okeys: totalOkeys, total_penalties: totalPenalties, total_finished_hands: totalFinishedHands, highest_round_score: highestRoundScore, lowest_round_score: lowestRoundScore, team1_total_score: team1TotalScore, team2_total_score: team2TotalScore };
   };
 
-  const executeFinishGame = async () => {
+  const executeFinishGame = () => {
     const groupScores = getGroupScores();
     const playersWithStats = players.map((player, index) => ({
       name: player.name, score: getTotalScore(index), originalIndex: index, stats: getPlayerStats(index),
@@ -301,19 +301,20 @@ function GamePageContent() {
       endData.winnerScore = sortedPlayers[0].score;
       endData.scoreFark = sortedPlayers.length > 1 ? Math.abs(sortedPlayers[0].score - sortedPlayers[1].score) : 0;
     }
-    try {
-      const gameId = localStorage.getItem('currentGameId');
-      if (gameId) {
-        const gameStats = calculateGameStatistics(roundDetails, gameData!);
-        const requestBody: any = { winner_name: endData.winner, winner_type: endData.winnerType };
-        if (user) { requestBody.game_statistics = gameStats; requestBody.user_won = false; }
-        await fetch(`/api/games/${gameId}/finish`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
-        localStorage.removeItem('currentGameId');
-      }
-    } catch (error) { console.error('Oyun bitirme kaydı hatası:', error); }
+    // Modalı hemen aç, API kaydını arka planda yap
     setGameEndData(endData);
     setShowGameEndModal(true);
     setShowCalculation(false);
+
+    const gameId = localStorage.getItem('currentGameId');
+    if (gameId) {
+      const gameStats = calculateGameStatistics(roundDetails, gameData!);
+      const requestBody: any = { winner_name: endData.winner, winner_type: endData.winnerType };
+      if (user) { requestBody.game_statistics = gameStats; requestBody.user_won = false; }
+      fetch(`/api/games/${gameId}/finish`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) })
+        .then(() => localStorage.removeItem('currentGameId'))
+        .catch((error) => console.error('Oyun bitirme kaydı hatası:', error));
+    }
   };
 
   const executeNewGame = () => {
