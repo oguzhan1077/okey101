@@ -1,13 +1,12 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
-const supabase = createClient(
+const anonClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Oyunu bitir ve istatistikleri kaydet
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -17,40 +16,28 @@ export async function PATCH(
     const body = await request.json();
     const { winner_name, winner_type, game_statistics, user_won } = body;
 
-    // Kullanıcı kimliğini session'dan doğrula, client'tan gelen user_id'yi kullanma
+    // Kullanıcıyı session'dan doğrula
     const serverClient = await createSupabaseServerClient();
     const { data: { user } } = await serverClient.auth.getUser();
     const user_id = user?.id ?? null;
 
-    // Önce oyunun zaten bitip bitmediğini kontrol et
-    const { data: existingGame } = await supabase
+    // Kimliği doğrulanmış kullanıcı için serverClient, misafir için anonClient
+    const db: SupabaseClient = user ? serverClient : anonClient;
+
+    const { data: existingGame } = await db
       .from('games')
       .select('finished_at')
       .eq('id', id)
       .single();
 
     if (existingGame?.finished_at) {
-      // Oyun zaten bitmiş, tekrar bitirme
-      console.log('Game already finished:', id);
-      return NextResponse.json(
-        { message: 'Game already finished', data: existingGame },
-        { status: 200 }
-      );
+      return NextResponse.json({ message: 'Game already finished', data: existingGame }, { status: 200 });
     }
 
-    // Oyunu bitir - sadece özet bilgiler
-    const updateData: any = {
-      winner_name,
-      winner_type,
-      finished_at: new Date().toISOString(),
-    };
+    const updateData: any = { winner_name, winner_type, finished_at: new Date().toISOString() };
+    if (user_id) updateData.user_id = user_id;
 
-    // Eğer user_id varsa ekle (üye kullanıcı)
-    if (user_id) {
-      updateData.user_id = user_id;
-    }
-
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('games')
       .update(updateData)
       .eq('id', id)
@@ -59,105 +46,82 @@ export async function PATCH(
 
     if (error) {
       console.error('Game finish error:', error);
-      return NextResponse.json(
-        { error: 'Failed to finish game' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to finish game' }, { status: 500 });
     }
 
-    // Bağımsız işlemleri paralel çalıştır
     await Promise.allSettled([
       user_id && game_statistics
-        ? saveGameStatistics(id, user_id, game_statistics)
+        ? saveGameStatistics(id, user_id, game_statistics, serverClient)
         : Promise.resolve(),
       user_id
-        ? updateUserProfile(user_id, data.game_mode, user_won === true, data.total_rounds)
+        ? updateUserProfile(user_id, data.game_mode, user_won === true, data.total_rounds, serverClient)
         : Promise.resolve(),
     ]);
 
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error finishing game:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// Detaylı oyun istatistiklerini kaydet
 async function saveGameStatistics(
   gameId: string,
   userId: string,
-  statistics: any
+  statistics: any,
+  db: SupabaseClient,
 ) {
   try {
-    const { error } = await supabase
-      .from('game_statistics')
-      .insert([
-        {
-          game_id: gameId,
-          user_id: userId,
-          players: statistics.players,
-          total_okeys: statistics.total_okeys || 0,
-          total_penalties: statistics.total_penalties || 0,
-          total_finished_hands: statistics.total_finished_hands || 0,
-          highest_round_score: statistics.highest_round_score || 0,
-          lowest_round_score: statistics.lowest_round_score || 0,
-          team1_total_score: statistics.team1_total_score || 0,
-          team2_total_score: statistics.team2_total_score || 0,
-        },
-      ]);
-
-    if (error) {
-      console.error('Error saving game statistics:', error);
-    }
+    const { error } = await db.from('game_statistics').insert([{
+      game_id: gameId,
+      user_id: userId,
+      players: statistics.players,
+      total_okeys: statistics.total_okeys || 0,
+      total_penalties: statistics.total_penalties || 0,
+      total_finished_hands: statistics.total_finished_hands || 0,
+      highest_round_score: statistics.highest_round_score || 0,
+      lowest_round_score: statistics.lowest_round_score || 0,
+      team1_total_score: statistics.team1_total_score || 0,
+      team2_total_score: statistics.team2_total_score || 0,
+    }]);
+    if (error) console.error('Error saving game statistics:', error);
   } catch (error) {
     console.error('Error in saveGameStatistics:', error);
   }
 }
 
-// Kullanıcı profilini güncelle
 async function updateUserProfile(
   userId: string,
   gameMode: string,
   isWinner: boolean,
-  totalRounds: number
+  totalRounds: number,
+  db: SupabaseClient,
 ) {
   try {
-    // Mevcut profili getir
-    const { data: profile } = await supabase
+    const { data: profile } = await db
       .from('user_profiles')
       .select('*')
       .eq('id', userId)
       .single();
-    
+
     if (profile) {
-      // Güncelle
-      await supabase
-        .from('user_profiles')
-        .update({
-          total_games_played: (profile.total_games_played || 0) + 1,
-          total_games_won: (profile.total_games_won || 0) + (isWinner ? 1 : 0),
-          total_rounds_played: (profile.total_rounds_played || 0) + totalRounds,
-          favorite_mode: gameMode,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId);
+      await db.from('user_profiles').update({
+        total_games_played: (profile.total_games_played || 0) + 1,
+        total_games_won: (profile.total_games_won || 0) + (isWinner ? 1 : 0),
+        total_rounds_played: (profile.total_rounds_played || 0) + totalRounds,
+        favorite_mode: gameMode,
+        updated_at: new Date().toISOString(),
+      }).eq('id', userId);
     } else {
-      // İlk kez oluştur
-      await supabase.from('user_profiles').insert([
-        {
-          id: userId,
-          total_games_played: 1,
-          total_games_won: isWinner ? 1 : 0,
-          total_rounds_played: totalRounds,
-          favorite_mode: gameMode,
-        },
-      ]);
+      await db.from('user_profiles').insert([{
+        id: userId,
+        total_games_played: 1,
+        total_games_won: isWinner ? 1 : 0,
+        total_rounds_played: totalRounds,
+        favorite_mode: gameMode,
+      }]);
     }
   } catch (error) {
     console.error('Error updating user profile:', error);
   }
 }
-
