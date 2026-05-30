@@ -500,15 +500,46 @@ function GamePageContent() {
   }, [playerScores, gameData?.gameMode, getTeammateIndex, inputValues, isHandFinish]);
 
   const toggleIsHandFinish = useCallback(() => {
-    const hasFinisher = playerScores.some(s => s.finished);
-    if (hasFinisher) {
-      setPlayerScores(prev => prev.map(score => ({
-        ...score, points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0, finished: false, handFinished: false,
-      })));
-      setInputValues(['', '', '', '']);
+    const newIsHandFinish = !isHandFinish;
+    const finisherIndex = playerScores.findIndex(s => s.finished);
+    const ti = getTeammateIndex(finisherIndex);
+    const isGroup = gameData?.gameMode === 'group';
+
+    if (finisherIndex !== -1) {
+      if (newIsHandFinish) {
+        // Normal → Elden: mevcut bitireni elden kurallarıyla yeniden uygula
+        setPlayerScores(prev => prev.map((score, index) => {
+          const base = { ...score, points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0, finished: false, handFinished: false };
+          if (isGroup) {
+            if (index === finisherIndex) return { ...base, points: -202, handFinished: true, finished: true };
+            if (index === ti) return { ...base, points: 0 };
+            return { ...base, points: 202, individualPenalty: 202, penalty: 202 };
+          }
+          if (index === finisherIndex) return { ...base, points: -202, handFinished: true, finished: true };
+          return { ...base, points: 202, individualPenalty: 202, penalty: 202 };
+        }));
+        const newIV = ['', '', '', ''];
+        newIV[finisherIndex] = '-202';
+        if (isGroup) {
+          if (ti !== -1) newIV[ti] = '0';
+          [0, 1, 2, 3].forEach(i => { if (i !== finisherIndex && i !== ti) newIV[i] = '202'; });
+        } else {
+          [0, 1, 2, 3].forEach(i => { if (i !== finisherIndex) newIV[i] = '202'; });
+        }
+        setInputValues(newIV);
+      } else {
+        // Elden → Normal: mevcut bitireni normal kurallarla yeniden uygula
+        setPlayerScores(prev => prev.map((score, index) => {
+          if (index === finisherIndex)
+            return { ...score, points: 0, handFinished: false, finished: true };
+          return { ...score, points: 0, penalty: 0, individualPenalty: 0, teamPenalty: 0, finished: false, handFinished: false };
+        }));
+        setInputValues(['', '', '', '']);
+      }
     }
-    setIsHandFinish(prev => !prev);
-  }, [playerScores]);
+
+    setIsHandFinish(newIsHandFinish);
+  }, [isHandFinish, playerScores, gameData?.gameMode, getTeammateIndex]);
 
   const isPointInputDisabled = useCallback((playerIndex: number) => {
     if (playerScores[playerIndex]?.finished) return true;
