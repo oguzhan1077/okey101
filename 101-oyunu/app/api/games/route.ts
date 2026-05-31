@@ -30,16 +30,16 @@ export async function POST(request: Request) {
     if (error) {
       console.error('Game creation error:', error);
       return NextResponse.json(
-        { error: 'Failed to create game' },
+        { error: 'Failed to create game', detail: error.message, code: error.code },
         { status: 500 }
       );
     }
 
     return NextResponse.json(data, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating game:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', detail: error?.message },
       { status: 500 }
     );
   }
