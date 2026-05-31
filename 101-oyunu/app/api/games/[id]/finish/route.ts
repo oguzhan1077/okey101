@@ -50,8 +50,6 @@ export async function PATCH(
   }
 
   // 2. Kullanıcıya özel işlemler — access_token ile authenticated client
-  const debugLog: any = { client_user_id, has_game_statistics: !!game_statistics, has_token: !!access_token };
-
   if (client_user_id && access_token) {
     const authClient = createAuthClient(access_token);
 
@@ -69,13 +67,13 @@ export async function PATCH(
         team1_total_score: game_statistics.team1_total_score || 0,
         team2_total_score: game_statistics.team2_total_score || 0,
       }]);
-      debugLog.stats_error = statsError ? { message: statsError.message, code: statsError.code } : null;
+      if (statsError) console.error('Error saving game statistics:', statsError.message);
     }
 
     await updateUserProfile(client_user_id, data.game_mode, data.total_rounds, authClient);
   }
 
-  return NextResponse.json({ ...data, _debug: debugLog });
+  return NextResponse.json(data);
 }
 
 async function updateUserProfile(
