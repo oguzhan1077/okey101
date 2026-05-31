@@ -92,6 +92,8 @@ function HomeContent() {
         game_mode: gameMode,
         team1_name: gameMode === 'group' ? group1Name : null,
         team2_name: gameMode === 'group' ? group2Name : null,
+        players: [player1, player2, player3, player4],
+        user_id: user?.id ?? null,
       }),
     }).then(async (response) => {
       if (response.ok) {

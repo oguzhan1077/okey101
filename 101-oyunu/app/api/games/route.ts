@@ -4,10 +4,11 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { game_mode, team1_name, team2_name } = body;
+    const { game_mode, team1_name, team2_name, players, user_id: bodyUserId } = body;
 
     const db = await createSupabaseServerClient();
     const { data: { user } } = await db.auth.getUser();
+    const user_id = user?.id ?? bodyUserId ?? null;
 
     const { data, error } = await db
       .from('games')
@@ -17,8 +18,9 @@ export async function POST(request: Request) {
           player_count: 4,
           team1_name: game_mode === 'group' ? team1_name : null,
           team2_name: game_mode === 'group' ? team2_name : null,
+          players: players ?? null,
           total_rounds: 0,
-          user_id: user?.id ?? null,
+          user_id,
         },
       ])
       .select()
