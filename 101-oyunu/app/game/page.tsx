@@ -277,7 +277,21 @@ function GamePageContent() {
     if (lowestRoundScore === Infinity) lowestRoundScore = 0;
     const team1TotalScore = game.gameMode === 'group' ? playerStats[0].total_score + playerStats[2].total_score : 0;
     const team2TotalScore = game.gameMode === 'group' ? playerStats[1].total_score + playerStats[3].total_score : 0;
-    return { players: playerStats, total_okeys: totalOkeys, total_penalties: totalPenalties, total_finished_hands: totalFinishedHands, highest_round_score: highestRoundScore, lowest_round_score: lowestRoundScore, team1_total_score: team1TotalScore, team2_total_score: team2TotalScore };
+    const roundDetails = rounds.map(round => ({
+      round: round.round,
+      players: round.players.map((p, i) => ({
+        name: game.players[i],
+        points: p.points,
+        penalty: p.penalty,
+        individual_penalty: p.individualPenalty || 0,
+        has_okey1: p.hasOkey1,
+        has_okey2: p.hasOkey2,
+        total: p.total,
+        finished: p.finished,
+        hand_finished: p.handFinished,
+      })),
+    }));
+    return { players: playerStats, rounds: roundDetails, total_okeys: totalOkeys, total_penalties: totalPenalties, total_finished_hands: totalFinishedHands, highest_round_score: highestRoundScore, lowest_round_score: lowestRoundScore, team1_total_score: team1TotalScore, team2_total_score: team2TotalScore };
   };
 
   const executeFinishGame = () => {

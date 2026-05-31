@@ -76,6 +76,7 @@ async function saveGameStatistics(
       game_id: gameId,
       user_id: userId,
       players: statistics.players,
+      rounds: statistics.rounds || null,
       total_okeys: statistics.total_okeys || 0,
       total_penalties: statistics.total_penalties || 0,
       total_finished_hands: statistics.total_finished_hands || 0,
