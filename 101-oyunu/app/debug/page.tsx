@@ -8,29 +8,42 @@ export default function DebugPage() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  const testGameCreate = async () => {
+  const runTest = async (label: string, body: object) => {
     setLoading(true);
     setResult(null);
     try {
       const response = await fetch('/api/games', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          game_mode: 'single',
-          team1_name: null,
-          team2_name: null,
-          players: ['Test1', 'Test2', 'Test3', 'Test4'],
-          user_id: null,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await response.json();
-      setResult({ status: response.status, ok: response.ok, data });
+      setResult({ label, status: response.status, ok: response.ok, data });
     } catch (err: any) {
-      setResult({ error: err.message });
+      setResult({ label, error: err.message });
     } finally {
       setLoading(false);
     }
   };
+
+  const tests = [
+    {
+      label: '1) Single mod, user_id yok',
+      body: { game_mode: 'single', team1_name: null, team2_name: null, players: ['A', 'B', 'C', 'D'], user_id: null },
+    },
+    {
+      label: '2) Group mod, user_id yok',
+      body: { game_mode: 'group', team1_name: 'Takım 1', team2_name: 'Takım 2', players: ['A', 'B', 'C', 'D'], user_id: null },
+    },
+    {
+      label: '3) Group mod, Türkçe karakter',
+      body: { game_mode: 'group', team1_name: 'Oğuzhan Çağlar', team2_name: 'Deniz Berk', players: ['Oğuzhan', 'Levent', 'Deniz', 'Berk'], user_id: null },
+    },
+    {
+      label: '4) Single mod, sahte user_id',
+      body: { game_mode: 'single', team1_name: null, team2_name: null, players: ['A', 'B', 'C', 'D'], user_id: '00000000-0000-0000-0000-000000000000' },
+    },
+  ];
 
   return (
     <div className="p-8 bg-gray-900 text-white min-h-screen">
@@ -52,14 +65,19 @@ export default function DebugPage() {
       </div>
 
       <div className="bg-gray-800 p-4 rounded">
-        <h2 className="text-lg font-semibold mb-3">Games API Testi</h2>
-        <button
-          onClick={testGameCreate}
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded font-medium mb-4"
-        >
-          {loading ? 'Test ediliyor...' : 'Test Oyunu Oluştur'}
-        </button>
+        <h2 className="text-lg font-semibold mb-3">Games API Testleri</h2>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {tests.map((t) => (
+            <button
+              key={t.label}
+              onClick={() => runTest(t.label, t.body)}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-2 rounded text-sm font-medium"
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
         {result && (
           <div className={`p-3 rounded ${result.ok ? 'bg-green-900' : 'bg-red-900'}`}>
