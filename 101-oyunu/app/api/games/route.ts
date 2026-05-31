@@ -9,7 +9,7 @@ const supabase = createClient(
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { game_mode, team1_name, team2_name, players, user_id } = body;
+    const { game_mode, team1_name, team2_name, players } = body;
 
     const { data, error } = await supabase
       .from('games')
@@ -21,7 +21,6 @@ export async function POST(request: Request) {
           team2_name: game_mode === 'group' ? team2_name : null,
           players: players ?? null,
           total_rounds: 0,
-          user_id: user_id ?? null,
         },
       ])
       .select()

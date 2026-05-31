@@ -14,12 +14,12 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { winner_name, winner_type, game_statistics, user_won } = body;
+    const { winner_name, winner_type, game_statistics, client_user_id } = body;
 
-    // Kullanıcıyı session'dan doğrula
+    // Kullanıcıyı session'dan doğrula, başarısız olursa client'tan gelen id'yi kullan
     const serverClient = await createSupabaseServerClient();
     const { data: { user } } = await serverClient.auth.getUser();
-    const user_id = user?.id ?? null;
+    const user_id = user?.id ?? client_user_id ?? null;
 
     // Kimliği doğrulanmış kullanıcı için serverClient, misafir için anonClient
     const db: SupabaseClient = user ? serverClient : anonClient;
