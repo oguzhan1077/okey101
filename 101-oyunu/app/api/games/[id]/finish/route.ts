@@ -43,24 +43,35 @@ export async function PATCH(
   }
 
   // 2. Kullanıcıya özel işlemler — istatistik ve profil
-  if (client_user_id) {
-    try {
-      const serverClient = await createSupabaseServerClient();
-      const { data: { user } } = await serverClient.auth.getUser();
-      const db: SupabaseClient = user ? serverClient : anonClient;
+  const debugLog: any = { client_user_id, has_game_statistics: !!game_statistics };
 
-      await Promise.allSettled([
-        game_statistics
-          ? saveGameStatistics(id, client_user_id, game_statistics, db)
-          : Promise.resolve(),
-        updateUserProfile(client_user_id, data.game_mode, data.total_rounds, db),
-      ]);
-    } catch (err) {
-      console.error('User-specific operations failed (non-critical):', err);
+  if (client_user_id) {
+    const serverClient = await createSupabaseServerClient();
+    const { data: { user } } = await serverClient.auth.getUser();
+    const db: SupabaseClient = user ? serverClient : anonClient;
+    debugLog.session_user = user?.id ?? null;
+
+    if (game_statistics) {
+      const { error: statsError } = await db.from('game_statistics').insert([{
+        game_id: id,
+        user_id: client_user_id,
+        players: game_statistics.players,
+        rounds: game_statistics.rounds || null,
+        total_okeys: game_statistics.total_okeys || 0,
+        total_penalties: game_statistics.total_penalties || 0,
+        total_finished_hands: game_statistics.total_finished_hands || 0,
+        highest_round_score: game_statistics.highest_round_score || 0,
+        lowest_round_score: game_statistics.lowest_round_score || 0,
+        team1_total_score: game_statistics.team1_total_score || 0,
+        team2_total_score: game_statistics.team2_total_score || 0,
+      }]);
+      debugLog.stats_error = statsError ? { message: statsError.message, code: statsError.code } : null;
     }
+
+    await updateUserProfile(client_user_id, data.game_mode, data.total_rounds, db);
   }
 
-  return NextResponse.json(data);
+  return NextResponse.json({ ...data, _debug: debugLog });
 }
 
 async function saveGameStatistics(
