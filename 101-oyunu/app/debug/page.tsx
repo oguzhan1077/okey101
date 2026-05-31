@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 export default function DebugPage() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -10,49 +11,54 @@ export default function DebugPage() {
   const [loading, setLoading] = useState(false);
   const { user, session } = useAuth();
 
-  const runTest = async (label: string, body: object) => {
+  // public.users'da bu kullanıcı var mı?
+  const checkPublicUsers = async () => {
+    if (!supabase || !user) return;
+    setLoading(true);
+    setResult(null);
+    const { data, error } = await supabase.from('users').select('id').eq('id', user.id);
+    setResult({ label: 'public.users kontrolü', data, error: error?.message });
+    setLoading(false);
+  };
+
+  // Gerçek user_id ile bir game oluştur ve finish et
+  const testFullFlow = async () => {
+    if (!supabase || !user) return;
     setLoading(true);
     setResult(null);
     try {
-      const response = await fetch('/api/games', {
+      // 1. Oyun oluştur
+      const createRes = await fetch('/api/games', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ game_mode: 'single', players: ['A', 'B', 'C', 'D'] }),
       });
-      const data = await response.json();
-      setResult({ label, status: response.status, ok: response.ok, data });
+      const game = await createRes.json();
+      if (!createRes.ok) { setResult({ label: 'Create hatası', game }); setLoading(false); return; }
+
+      // 2. Finish et
+      const finishRes = await fetch(`/api/games/${game.id}/finish`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ winner_name: 'A', winner_type: 'single', client_user_id: user.id }),
+      });
+      const finished = await finishRes.json();
+
+      // 3. Sonucu oku
+      const { data: check } = await supabase.from('games').select('id, user_id, finished_at').eq('id', game.id).single();
+      setResult({ label: 'Tam akış testi', game_id: game.id, finish_status: finishRes.status, finish_data: finished, db_check: check });
     } catch (err: any) {
-      setResult({ label, error: err.message });
-    } finally {
-      setLoading(false);
+      setResult({ label: 'Hata', error: err.message });
     }
+    setLoading(false);
   };
 
-  const tests = [
-    {
-      label: '1) Single mod, user_id yok',
-      body: { game_mode: 'single', team1_name: null, team2_name: null, players: ['A', 'B', 'C', 'D'], user_id: null },
-    },
-    {
-      label: '2) Group mod, user_id yok',
-      body: { game_mode: 'group', team1_name: 'Takım 1', team2_name: 'Takım 2', players: ['A', 'B', 'C', 'D'], user_id: null },
-    },
-    {
-      label: '3) Group mod, Türkçe karakter',
-      body: { game_mode: 'group', team1_name: 'Oğuzhan Çağlar', team2_name: 'Deniz Berk', players: ['Oğuzhan', 'Levent', 'Deniz', 'Berk'], user_id: null },
-    },
-    {
-      label: '4) Single mod, sahte user_id',
-      body: { game_mode: 'single', team1_name: null, team2_name: null, players: ['A', 'B', 'C', 'D'], user_id: '00000000-0000-0000-0000-000000000000' },
-    },
-  ];
-
   return (
-    <div className="p-8 bg-gray-900 text-white min-h-screen">
-      <h1 className="text-2xl font-bold mb-6">Debug Paneli</h1>
+    <div className="p-8 bg-gray-900 text-white min-h-screen space-y-4">
+      <h1 className="text-2xl font-bold">Debug Paneli</h1>
 
       {/* Auth Durumu */}
-      <div className={`p-4 rounded mb-6 ${user ? 'bg-green-900' : 'bg-red-900'}`}>
+      <div className={`p-4 rounded ${user ? 'bg-green-900' : 'bg-red-900'}`}>
         <h2 className="font-semibold mb-2">Auth Durumu</h2>
         {user ? (
           <>
@@ -62,46 +68,28 @@ export default function DebugPage() {
             <p className="font-mono text-xs">session token: {session?.access_token ? '✅ var' : '❌ yok'}</p>
           </>
         ) : (
-          <p>❌ Giriş yapılmamış — user null</p>
+          <p>❌ Giriş yapılmamış</p>
         )}
       </div>
 
-      <div className="space-y-4 mb-8">
-        <div className="bg-gray-800 p-4 rounded">
-          <h2 className="font-semibold mb-1">NEXT_PUBLIC_SUPABASE_URL:</h2>
-          <p className="font-mono text-green-400">
-            {supabaseUrl ? `✅ ${supabaseUrl.substring(0, 30)}...` : '❌ Değer yok!'}
-          </p>
-        </div>
-        <div className="bg-gray-800 p-4 rounded">
-          <h2 className="font-semibold mb-1">NEXT_PUBLIC_SUPABASE_ANON_KEY:</h2>
-          <p className="font-mono text-green-400">
-            {supabaseKey ? `✅ Değer var (${supabaseKey.length} karakter)` : '❌ Değer yok!'}
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-gray-800 p-4 rounded">
-        <h2 className="text-lg font-semibold mb-3">Games API Testleri</h2>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {tests.map((t) => (
-            <button
-              key={t.label}
-              onClick={() => runTest(t.label, t.body)}
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-2 rounded text-sm font-medium"
-            >
-              {t.label}
-            </button>
-          ))}
+      {/* Testler */}
+      <div className="bg-gray-800 p-4 rounded space-y-3">
+        <h2 className="text-lg font-semibold">Testler</h2>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={checkPublicUsers} disabled={loading || !user}
+            className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 px-3 py-2 rounded text-sm font-medium">
+            public.users kontrolü
+          </button>
+          <button onClick={testFullFlow} disabled={loading || !user}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-2 rounded text-sm font-medium">
+            Tam akış testi (oluştur + bitir + kontrol)
+          </button>
         </div>
 
         {result && (
-          <div className={`p-3 rounded ${result.ok ? 'bg-green-900' : 'bg-red-900'}`}>
-            <p className="font-semibold mb-2">
-              {result.ok ? '✅ Başarılı' : `❌ Hata (HTTP ${result.status})`}
-            </p>
-            <pre className="text-xs overflow-auto text-yellow-300">
+          <div className="bg-gray-900 p-3 rounded">
+            <p className="font-semibold mb-2 text-yellow-400">{result.label}</p>
+            <pre className="text-xs overflow-auto text-green-300">
               {JSON.stringify(result, null, 2)}
             </pre>
           </div>
