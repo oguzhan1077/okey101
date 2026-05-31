@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 
 export default function DebugPage() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const { user, session } = useAuth();
 
   const runTest = async (label: string, body: object) => {
     setLoading(true);
@@ -48,6 +50,21 @@ export default function DebugPage() {
   return (
     <div className="p-8 bg-gray-900 text-white min-h-screen">
       <h1 className="text-2xl font-bold mb-6">Debug Paneli</h1>
+
+      {/* Auth Durumu */}
+      <div className={`p-4 rounded mb-6 ${user ? 'bg-green-900' : 'bg-red-900'}`}>
+        <h2 className="font-semibold mb-2">Auth Durumu</h2>
+        {user ? (
+          <>
+            <p>✅ Giriş yapılmış</p>
+            <p className="font-mono text-xs mt-1">user.id: {user.id}</p>
+            <p className="font-mono text-xs">email: {user.email}</p>
+            <p className="font-mono text-xs">session token: {session?.access_token ? '✅ var' : '❌ yok'}</p>
+          </>
+        ) : (
+          <p>❌ Giriş yapılmamış — user null</p>
+        )}
+      </div>
 
       <div className="space-y-4 mb-8">
         <div className="bg-gray-800 p-4 rounded">
