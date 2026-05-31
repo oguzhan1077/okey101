@@ -37,10 +37,29 @@ export default function DebugPage() {
       if (!createRes.ok) { setResult({ label: 'Create hatası', game }); setLoading(false); return; }
 
       // 2. Finish et
+      const sampleStats = {
+        players: [
+          { name: 'A', total_score: 80, okey_count: 1, penalty_count: 0, finished_count: 1, skill_score: 12 },
+          { name: 'B', total_score: 120, okey_count: 0, penalty_count: 1, finished_count: 0, skill_score: -15 },
+          { name: 'C', total_score: 100, okey_count: 0, penalty_count: 0, finished_count: 0, skill_score: -5 },
+          { name: 'D', total_score: 110, okey_count: 0, penalty_count: 0, finished_count: 0, skill_score: -8 },
+        ],
+        rounds: [
+          { round: 1, players: [
+            { name: 'A', points: 20, penalty: 0, individual_penalty: 0, has_okey1: true, has_okey2: false, total: 20, finished: true, hand_finished: false },
+            { name: 'B', points: 30, penalty: 0, individual_penalty: 0, has_okey1: false, has_okey2: false, total: 30, finished: false, hand_finished: false },
+            { name: 'C', points: 25, penalty: 0, individual_penalty: 0, has_okey1: false, has_okey2: false, total: 25, finished: false, hand_finished: false },
+            { name: 'D', points: 28, penalty: 0, individual_penalty: 0, has_okey1: false, has_okey2: false, total: 28, finished: false, hand_finished: false },
+          ]},
+        ],
+        total_okeys: 1, total_penalties: 1, total_finished_hands: 1,
+        highest_round_score: 30, lowest_round_score: 20,
+        team1_total_score: 0, team2_total_score: 0,
+      };
       const finishRes = await fetch(`/api/games/${game.id}/finish`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ winner_name: 'A', winner_type: 'single', client_user_id: user.id }),
+        body: JSON.stringify({ winner_name: 'A', winner_type: 'single', client_user_id: user.id, game_statistics: sampleStats }),
       });
       const finished = await finishRes.json();
 
