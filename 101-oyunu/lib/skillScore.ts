@@ -4,22 +4,26 @@
 // "şans etkisini" (okey) ve "hata ağırlığını" (bireysel ceza) hesaba katar.
 //
 // Parametreler:
-//   k  = okey katsayısı   (varsayılan 0.30)
-//   W  = ceza ağırlığı    (varsayılan 75)
+//   k             = okey katsayısı        (varsayılan 0.30)
+//   penaltyRate   = pozitif skill ceza oranı (varsayılan 0.15 — her cezada %15 silinir)
+//   penaltyDeepen = negatif skill derinleşme oranı (varsayılan 0.15 — her cezada %15 daha derin)
 //
 // Formül:
-//   Delta S = Ortalama − Oyuncu skoru
+//   baseSkill = ΔS / (1 + k × okey)    [başarılı, ΔS >= 0]
+//   baseSkill = ΔS × (1 + k × okey)    [başarısız, ΔS < 0]
 //
-//   Delta S >= 0 (başarılı): Skill = (ΔS / (1 + k × okey)) − (ceza × W)
-//   Delta S <  0 (başarısız): Skill = (ΔS × (1 + k × okey)) − (ceza × W)
+//   baseSkill >= 0: finalSkill = baseSkill × (1 − penaltyRate × cezaAdedi)
+//   baseSkill <  0: finalSkill = baseSkill × (1 + penaltyDeepen × cezaAdedi)
 
 // ── Tipler ───────────────────────────────────────────────────────────────────
 
 export interface SkillScoreConfig {
   /** Okey katsayısı — başarılı oyuncuda kazancı törpüler, başarısızda zararı büyütür */
   k: number;
-  /** Bireysel ceza başına skill puanından düşülecek sabit ağırlık */
-  W: number;
+  /** Pozitif skill'de her cezada silinecek oran (0.15 → %15) */
+  penaltyRate: number;
+  /** Negatif skill'de her cezada derinleşecek oran (0.15 → %15 daha derin) */
+  penaltyDeepen: number;
 }
 
 /** Tek bir oyuncunun o rounda ait ham giriş verisi */
@@ -55,7 +59,7 @@ export interface PlayerGameSkill {
 
 // ── Varsayılan Konfigurasyon ──────────────────────────────────────────────────
 
-export const DEFAULT_CONFIG: SkillScoreConfig = { k: 0.30, W: 75 };
+export const DEFAULT_CONFIG: SkillScoreConfig = { k: 0.30, penaltyRate: 0.15, penaltyDeepen: 0.15 };
 
 // ── Çekirdek Fonksiyonlar ─────────────────────────────────────────────────────
 
@@ -69,7 +73,7 @@ export function calculateRoundSkillScores(
 ): PlayerRoundSkill[] {
   if (players.length === 0) return [];
 
-  const { k, W } = config;
+  const { k, penaltyRate, penaltyDeepen } = config;
 
   // Masa zorluğu: bu rounddaki aritmetik ortalama
   const mean = players.reduce((sum, p) => sum + p.total, 0) / players.length;
@@ -82,14 +86,21 @@ export function calculateRoundSkillScores(
 
     const deltaS = mean - player.total;
 
-    let skillScore: number;
+    // Temel skill (ceza etkisi olmadan)
+    const baseSkill = deltaS >= 0
+      ? deltaS / (1 + k * okeyCount)   // başarılı: okey kazancı törpüler
+      : deltaS * (1 + k * okeyCount);  // başarısız: okey zararı büyütür
 
-    if (deltaS >= 0) {
-      // Başarılı oyuncu — okey varsa masa üstünlüğünü törpüle
-      skillScore = deltaS / (1 + k * okeyCount) - penaltyCount * W;
+    // Oransal ceza uygula
+    let skillScore: number;
+    if (penaltyCount === 0) {
+      skillScore = baseSkill;
+    } else if (baseSkill >= 0) {
+      // Pozitif skill: her ceza %penaltyRate siler
+      skillScore = baseSkill * (1 - penaltyRate * penaltyCount);
     } else {
-      // Başarısız oyuncu — okey varsa zararı büyüt (şansı varken kötü oynadı)
-      skillScore = deltaS * (1 + k * okeyCount) - penaltyCount * W;
+      // Negatif skill: her ceza %penaltyDeepen daha derin yapar
+      skillScore = baseSkill * (1 + penaltyDeepen * penaltyCount);
     }
 
     return {

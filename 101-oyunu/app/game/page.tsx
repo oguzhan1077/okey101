@@ -1256,7 +1256,7 @@ function GamePageContent() {
                 );
               })()}
 
-              <p className="text-[10px] text-l4 -mt-3 mb-5">* RBP: Round Başına Puan &nbsp;·&nbsp; SKILL: Beceri Puanı (okey katsayısı ×0.30, bireysel ceza −75 puan)</p>
+              <p className="text-[10px] text-l4 -mt-3 mb-5">* RBP: Round Başına Puan &nbsp;·&nbsp; SKILL: Beceri Puanı (okey ×0.30; ceza: +skill &rarr; %15 sil, −skill &rarr; %15 derinleş)</p>
 
               <div className="space-y-2">
                 <button
