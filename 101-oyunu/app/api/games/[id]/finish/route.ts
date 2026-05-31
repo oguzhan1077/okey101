@@ -54,7 +54,7 @@ export async function PATCH(
         ? saveGameStatistics(id, user_id, game_statistics, serverClient)
         : Promise.resolve(),
       user_id
-        ? updateUserProfile(user_id, data.game_mode, user_won === true, data.total_rounds, serverClient)
+        ? updateUserProfile(user_id, data.game_mode, data.total_rounds, serverClient)
         : Promise.resolve(),
     ]);
 
@@ -93,7 +93,6 @@ async function saveGameStatistics(
 async function updateUserProfile(
   userId: string,
   gameMode: string,
-  isWinner: boolean,
   totalRounds: number,
   db: SupabaseClient,
 ) {
@@ -107,7 +106,6 @@ async function updateUserProfile(
     if (profile) {
       await db.from('user_profiles').update({
         total_games_played: (profile.total_games_played || 0) + 1,
-        total_games_won: (profile.total_games_won || 0) + (isWinner ? 1 : 0),
         total_rounds_played: (profile.total_rounds_played || 0) + totalRounds,
         favorite_mode: gameMode,
         updated_at: new Date().toISOString(),
@@ -116,7 +114,6 @@ async function updateUserProfile(
       await db.from('user_profiles').insert([{
         id: userId,
         total_games_played: 1,
-        total_games_won: isWinner ? 1 : 0,
         total_rounds_played: totalRounds,
         favorite_mode: gameMode,
       }]);
