@@ -26,9 +26,13 @@ export async function PATCH(
     return NextResponse.json({ message: 'Game already finished', data: existingGame }, { status: 200 });
   }
 
+  // user_id'yi aynı update'e ekle — ayrı sorgu yerine tek seferde yazılır
+  const updateData: any = { winner_name, winner_type, finished_at: new Date().toISOString() };
+  if (client_user_id) updateData.user_id = client_user_id;
+
   const { data, error } = await anonClient
     .from('games')
-    .update({ winner_name, winner_type, finished_at: new Date().toISOString() })
+    .update(updateData)
     .eq('id', id)
     .select()
     .single();
@@ -38,16 +42,12 @@ export async function PATCH(
     return NextResponse.json({ error: 'Failed to finish game', detail: error.message }, { status: 500 });
   }
 
-  // 2. Kullanıcıya özel işlemler — session veya client_user_id ile
+  // 2. Kullanıcıya özel işlemler — istatistik ve profil
   if (client_user_id) {
     try {
-      // Authenticated client ile user_id güncelle ve istatistikleri kaydet
       const serverClient = await createSupabaseServerClient();
       const { data: { user } } = await serverClient.auth.getUser();
       const db: SupabaseClient = user ? serverClient : anonClient;
-
-      // user_id'yi games tablosuna yaz (authenticated client ile RLS sorunsuz geçer)
-      await db.from('games').update({ user_id: client_user_id }).eq('id', id);
 
       await Promise.allSettled([
         game_statistics
