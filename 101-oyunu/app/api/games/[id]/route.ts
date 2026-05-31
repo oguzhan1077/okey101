@@ -1,12 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-// Round ekle (client'tan gelen round sayısını direkt yaz - tek sorgu)
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -20,7 +14,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'total_rounds required' }, { status: 400 });
     }
 
-    const { error } = await supabase
+    const db = await createSupabaseServerClient();
+    const { error } = await db
       .from('games')
       .update({ total_rounds })
       .eq('id', id);
@@ -42,4 +37,3 @@ export async function PATCH(
     );
   }
 }
-

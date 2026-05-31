@@ -1,18 +1,15 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-// Yeni oyun başlat (basitleştirilmiş)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { game_mode, team1_name, team2_name } = body;
 
-    const { data, error } = await supabase
+    const db = await createSupabaseServerClient();
+    const { data: { user } } = await db.auth.getUser();
+
+    const { data, error } = await db
       .from('games')
       .insert([
         {
@@ -21,6 +18,7 @@ export async function POST(request: Request) {
           team1_name: game_mode === 'group' ? team1_name : null,
           team2_name: game_mode === 'group' ? team2_name : null,
           total_rounds: 0,
+          user_id: user?.id ?? null,
         },
       ])
       .select()
@@ -44,7 +42,6 @@ export async function POST(request: Request) {
   }
 }
 
-// Oyun ID'sine göre oyun getir
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -57,7 +54,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const { data, error } = await supabase
+    const db = await createSupabaseServerClient();
+    const { data, error } = await db
       .from('games')
       .select('*')
       .eq('id', gameId)
@@ -79,4 +77,3 @@ export async function GET(request: Request) {
     );
   }
 }
-
