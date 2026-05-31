@@ -59,7 +59,7 @@ export default function DebugPage() {
       const finishRes = await fetch(`/api/games/${game.id}/finish`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ winner_name: 'A', winner_type: 'single', client_user_id: user.id, game_statistics: sampleStats }),
+        body: JSON.stringify({ winner_name: 'A', winner_type: 'single', client_user_id: user.id, access_token: session?.access_token ?? null, game_statistics: sampleStats }),
       });
       const finished = await finishRes.json();
 

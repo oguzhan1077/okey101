@@ -62,7 +62,7 @@ interface GameData {
 function GamePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
 
   // Aktif görünüm: skor tablosu veya round girişi
   const [view, setView] = useState<'scoreboard' | 'round'>('scoreboard');
@@ -343,7 +343,7 @@ function GamePageContent() {
         ...p,
         skill_score: endData.skillScores?.[p.name] ?? null,
       }));
-      const requestBody: any = { winner_name: endData.winner, winner_type: endData.winnerType, client_user_id: user?.id ?? null };
+      const requestBody: any = { winner_name: endData.winner, winner_type: endData.winnerType, client_user_id: user?.id ?? null, access_token: session?.access_token ?? null };
       if (user) { requestBody.game_statistics = gameStats; }
       fetch(`/api/games/${gameId}/finish`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) })
         .then(() => localStorage.removeItem('currentGameId'))

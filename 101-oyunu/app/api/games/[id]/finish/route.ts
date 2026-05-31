@@ -1,11 +1,19 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 const anonClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+// access_token ile authenticated client oluştur — auth.uid() çalışır, RLS geçer
+function createAuthClient(accessToken: string): SupabaseClient {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${accessToken}` } } }
+  );
+}
 
 export async function PATCH(
   request: Request,
@@ -13,7 +21,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { winner_name, winner_type, game_statistics, client_user_id } = body;
+  const { winner_name, winner_type, game_statistics, client_user_id, access_token } = body;
 
   // 1. Temel oyun güncellemesi — anon client, her zaman çalışır
   const { data: existingGame } = await anonClient
@@ -26,7 +34,6 @@ export async function PATCH(
     return NextResponse.json({ message: 'Game already finished', data: existingGame }, { status: 200 });
   }
 
-  // user_id'yi aynı update'e ekle — ayrı sorgu yerine tek seferde yazılır
   const updateData: any = { winner_name, winner_type, finished_at: new Date().toISOString() };
   if (client_user_id) updateData.user_id = client_user_id;
 
@@ -42,17 +49,14 @@ export async function PATCH(
     return NextResponse.json({ error: 'Failed to finish game', detail: error.message }, { status: 500 });
   }
 
-  // 2. Kullanıcıya özel işlemler — istatistik ve profil
-  const debugLog: any = { client_user_id, has_game_statistics: !!game_statistics };
+  // 2. Kullanıcıya özel işlemler — access_token ile authenticated client
+  const debugLog: any = { client_user_id, has_game_statistics: !!game_statistics, has_token: !!access_token };
 
-  if (client_user_id) {
-    const serverClient = await createSupabaseServerClient();
-    const { data: { user } } = await serverClient.auth.getUser();
-    const db: SupabaseClient = user ? serverClient : anonClient;
-    debugLog.session_user = user?.id ?? null;
+  if (client_user_id && access_token) {
+    const authClient = createAuthClient(access_token);
 
     if (game_statistics) {
-      const { error: statsError } = await db.from('game_statistics').insert([{
+      const { error: statsError } = await authClient.from('game_statistics').insert([{
         game_id: id,
         user_id: client_user_id,
         players: game_statistics.players,
@@ -68,36 +72,10 @@ export async function PATCH(
       debugLog.stats_error = statsError ? { message: statsError.message, code: statsError.code } : null;
     }
 
-    await updateUserProfile(client_user_id, data.game_mode, data.total_rounds, db);
+    await updateUserProfile(client_user_id, data.game_mode, data.total_rounds, authClient);
   }
 
   return NextResponse.json({ ...data, _debug: debugLog });
-}
-
-async function saveGameStatistics(
-  gameId: string,
-  userId: string,
-  statistics: any,
-  db: SupabaseClient,
-) {
-  try {
-    const { error } = await db.from('game_statistics').insert([{
-      game_id: gameId,
-      user_id: userId,
-      players: statistics.players,
-      rounds: statistics.rounds || null,
-      total_okeys: statistics.total_okeys || 0,
-      total_penalties: statistics.total_penalties || 0,
-      total_finished_hands: statistics.total_finished_hands || 0,
-      highest_round_score: statistics.highest_round_score || 0,
-      lowest_round_score: statistics.lowest_round_score || 0,
-      team1_total_score: statistics.team1_total_score || 0,
-      team2_total_score: statistics.team2_total_score || 0,
-    }]);
-    if (error) console.error('Error saving game statistics:', error);
-  } catch (error) {
-    console.error('Error in saveGameStatistics:', error);
-  }
 }
 
 async function updateUserProfile(
