@@ -18,7 +18,12 @@ const BADGE_COLORS: Record<string, [string, string]> = {
   founder: ['#F7D774', '#C9921A'], // altın: açık → koyu
 };
 
-// Tırtıklı kenarlı mühür (Lucide "badge-check" biçimi, ISC lisanslı)
+// Tırtıklı kenarlı mühür: Lucide ikon kütüphanesindeki "badge-check" ikonunun dış çizgisi.
+// Lucide — ISC License. Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022
+// as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+// Permission to use, copy, modify, and/or distribute this software for any purpose with or without
+// fee is hereby granted, provided that the above copyright notice and this permission notice appear
+// in all copies. https://lucide.dev/license
 const SEAL = 'M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z';
 
 export function Badge({ badge, className = 'w-4 h-4' }: BadgeProps) {
