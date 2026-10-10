@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { TrophyIcon } from '@/components/Icons';
 import { GameMode, LeaderboardPage, LEADERBOARD_PAGE_SIZE, fetchLeaderboardPage, fetchPlayerRank } from '@/lib/gameApi';
+import { formatTag } from '@/lib/players';
 
 const PROVISIONAL_GAMES = 10; // rating_config.provisional_games ile aynı
 
@@ -101,9 +102,13 @@ export default function LeaderboardPageView() {
                   >
                     <span className={`w-7 text-center text-sm font-bold tabular-nums ${r.rank <= 3 ? 'text-ablue' : 'text-l3'}`}>{r.rank}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-l1 text-sm font-semibold truncate">{r.display_name}</div>
+                      <div className="text-l1 text-sm font-semibold truncate">
+                        {r.display_name} <span className="text-l4 font-normal">{formatTag(r.tag)}</span>
+                      </div>
                       <div className="text-l4 text-[11px]">
-                        {r.games_played} oyun{r.games_played < PROVISIONAL_GAMES ? ' · yerleşiyor' : ''}
+                        {r.games_played < PROVISIONAL_GAMES
+                          ? `${r.games_played} oyun · ilk ${PROVISIONAL_GAMES} oyun: ${r.games_played}/${PROVISIONAL_GAMES}`
+                          : `${r.games_played} oyun`}
                       </div>
                     </div>
                     <span className="text-l1 text-base font-bold tabular-nums">{Math.round(r.rating)}</span>
@@ -141,7 +146,9 @@ export default function LeaderboardPageView() {
 
         <p className="text-l4 text-xs mt-5 leading-relaxed">
           Herkes 1500 puanla başlar; puan 100'ün altına inmez. Sadece 4 oyuncunun da onayladığı dereceli oyunlar sayılır.
-          Puan, okey şansı düşülmüş beceriye göre değişir. İlk {PROVISIONAL_GAMES} oyunda daha hızlı, 2000 ve 2400 üstünde daha yavaş değişir.
+          Puan, okey şansı düşülmüş beceriye göre değişir. İlk {PROVISIONAL_GAMES} oyunda puan daha büyük adımlarla
+          değişir ki yeni oyuncu gerçek seviyesine çabuk otursun (&quot;ilk {PROVISIONAL_GAMES} oyun: 2/{PROVISIONAL_GAMES}&quot; bunu gösterir);
+          2000 ve 2400 üstünde değişim yavaşlar.
           Oyuncuya dokunarak istatistiklerini görebilirsin.
         </p>
       </div>

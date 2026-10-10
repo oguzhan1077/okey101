@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { CheckCircleIcon } from '@/components/Icons'
-import { NAME_REGEX, DISPLAY_NAME_MAX, validateDisplayName, isDisplayNameAvailable } from '@/lib/players'
+import { NAME_REGEX, DISPLAY_NAME_MAX, validateDisplayName } from '@/lib/players'
 
 export default function RegisterPage() {
   const [displayName, setDisplayName] = useState('')
@@ -43,18 +43,7 @@ export default function RegisterPage() {
       return
     }
 
-    try {
-      if (!(await isDisplayNameAvailable(displayName))) {
-        setError('Bu görünen ad başka bir oyuncu tarafından kullanılıyor')
-        setLoading(false)
-        return
-      }
-    } catch {
-      setError('Görünen ad kontrol edilemedi, tekrar deneyin')
-      setLoading(false)
-      return
-    }
-
+    // Aynı adı başkası da kullanabilir: kayıtta 4 haneli etiket verilir (Oğuzhan #1889)
     const { error } = await signUp(email, password, displayName)
 
     if (error) {
@@ -122,7 +111,7 @@ export default function RegisterPage() {
                 className="w-full px-4 py-3 bg-s2 border border-sep rounded-xl text-l1 transition-colors"
                 placeholder="Oyunlarda görünecek adın"
               />
-              <p className="text-l4 text-xs mt-1.5">Arkadaşların seni oyuna bu adla ekleyecek</p>
+              <p className="text-l4 text-xs mt-1.5">Adının yanına 4 haneli bir etiket eklenir (ör. Oğuzhan #1889); aynı adı başkası da kullanabilir</p>
             </div>
 
             <div>

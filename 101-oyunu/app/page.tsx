@@ -8,8 +8,8 @@ import { PersonIcon, PeopleIcon, LogoutIcon, TrophyIcon } from '@/components/Ico
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 import {
-  NAME_REGEX, DISPLAY_NAME_MAX, RegisteredPlayer, normalizeName, searchPlayers,
-  validateDisplayName, fetchOwnDisplayName, saveOwnDisplayName,
+  NAME_REGEX, PLAYER_INPUT_REGEX, DISPLAY_NAME_MAX, RegisteredPlayer, normalizeName, searchPlayers,
+  formatTag, nameWithTag, validateDisplayName, fetchOwnProfile, saveOwnDisplayName,
 } from '@/lib/players';
 import {
   GameMode, InviteRow, ActiveGameRow, NewGamePlayer,
@@ -41,16 +41,19 @@ function HomeContent() {
   const [startError, setStartError] = useState('');
 
   // Koltuk başına seçilen kayıtlı hesap (null = misafir) ve ad önerileri (sunucuda aranır, en fazla 5)
-  const [playerIds, setPlayerIds] = useState<(string | null)[]>([null, null, null, null]);
+  const [playerPicks, setPlayerPicks] = useState<(RegisteredPlayer | null)[]>([null, null, null, null]);
+  const [ambiguousSeats, setAmbiguousSeats] = useState([false, false, false, false]); // aynı adda birden çok hesap
   const [activeInput, setActiveInput] = useState<number | null>(null);
   const [suggestions, setSuggestions] = useState<RegisteredPlayer[]>([]);
   const playerNamesRef = useRef(playerNames);
   playerNamesRef.current = playerNames;
-  const playerIdsRef = useRef(playerIds);
-  playerIdsRef.current = playerIds;
+  const playerPicksRef = useRef(playerPicks);
+  playerPicksRef.current = playerPicks;
+  const pickedElsewhere = (index: number, id: string) => playerPicksRef.current.some((x, i) => i !== index && x?.id === id);
 
-  // Kullanıcının kendi görünen adı
+  // Kullanıcının kendi görünen adı ve etiketi
   const [ownName, setOwnName] = useState<string | null>(null);
+  const [ownTag, setOwnTag] = useState<number | null>(null);
   const [ownNameLoaded, setOwnNameLoaded] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [nameError, setNameError] = useState('');
@@ -78,8 +81,8 @@ function HomeContent() {
       setActiveGames([]);
       return;
     }
-    fetchOwnDisplayName(user.id)
-      .then(setOwnName)
+    fetchOwnProfile(user.id)
+      .then((p) => { setOwnName(p?.display_name ?? null); setOwnTag(p?.tag ?? null); })
       .catch((error) => console.error('Görünen ad alınamadı:', error))
       .finally(() => setOwnNameLoaded(true));
   }, [user]);
@@ -100,46 +103,55 @@ function HomeContent() {
 
   // Oyunu kuran kişi genelde masadadır: ilk oyuncuyu kendi adıyla doldur
   useEffect(() => {
-    if (ownName && user && gameMode && !playerNames[0]) setPlayer(0, ownName, user.id);
+    if (ownName && user && gameMode && !playerNames[0] && ownTag !== null) {
+      setPlayer(0, ownName, { id: user.id, display_name: ownName, tag: ownTag });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ownName, gameMode]);
+  }, [ownName, ownTag, gameMode]);
 
-  const setPlayer = (index: number, name: string, id: string | null) => {
+  const setPlayer = (index: number, name: string, pick: RegisteredPlayer | null) => {
     setPlayerNames((prev) => prev.map((n, i) => (i === index ? name : n)));
-    setPlayerIds((prev) => prev.map((x, i) => (i === index ? id : x)));
+    setPlayerPicks((prev) => prev.map((x, i) => (i === index ? pick : x)));
+    setAmbiguousSeats((prev) => prev.map((x, i) => (i === index ? false : x)));
   };
 
-  // Yazılan ad bir hesabın adıyla tam eşleşiyorsa o hesaba bağla (başka koltukta seçili değilse)
+  // Yazılan ad tek bir hesapla tam eşleşiyorsa o hesaba bağla. Aynı adda birden çok hesap
+  // varsa ("Deniz #3306", "Deniz #3742") bağlanmaz; listeden seçmek ya da etiketi yazmak gerekir.
   const resolveExact = (index: number, query: string, list: RegisteredPlayer[]) => {
     if (playerNamesRef.current[index].trim() !== query) return; // bu arada ad değişti
-    const exact = list.find((p) => normalizeName(p.display_name) === normalizeName(query));
-    if (!exact || playerIdsRef.current.some((x, i) => i !== index && x === exact.id)) return;
-    setPlayerIds((prev) => prev.map((x, i) => (i === index ? exact.id : x)));
+    const [namePart, tagPart = ''] = query.split('#');
+    const tagDigits = tagPart.replace(/\D/g, '');
+    const matches = list.filter((p) =>
+      normalizeName(p.display_name) === normalizeName(namePart)
+      && (!tagDigits || formatTag(p.tag) === `#${tagDigits.padStart(4, '0')}`));
+    setAmbiguousSeats((prev) => prev.map((x, i) => (i === index ? matches.length > 1 : x)));
+    if (matches.length !== 1 || pickedElsewhere(index, matches[0].id)) return;
+    setPlayerPicks((prev) => prev.map((x, i) => (i === index ? matches[0] : x)));
   };
 
   // Yazdıkça öneri: odaktaki kutu için 200 ms bekleyip sunucuda ara
   useEffect(() => {
     if (!user || activeInput === null) { setSuggestions([]); return; }
     const query = playerNames[activeInput].trim();
-    if (!query || playerIds[activeInput]) { setSuggestions([]); return; }
+    if (!query || playerPicks[activeInput]) { setSuggestions([]); return; }
     const index = activeInput;
     const timer = setTimeout(() => {
       searchPlayers(query)
         .then((list) => {
           resolveExact(index, query, list);
-          setSuggestions(list.filter((p) => !playerIdsRef.current.some((x, i) => i !== index && x === p.id)));
+          setSuggestions(list.filter((p) => !pickedElsewhere(index, p.id)));
         })
         .catch(() => setSuggestions([]));
     }, 200);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, activeInput, playerNames, playerIds]);
+  }, [user, activeInput, playerNames, playerPicks]);
 
   // Kutudan çıkınca: ad yazılıp öneri seçilmediyse tam eşleşmeyi bir kez daha dene
   const handlePlayerBlur = (index: number) => {
     setActiveInput((cur) => (cur === index ? null : cur));
     const query = playerNames[index].trim();
-    if (!user || !query || playerIds[index]) return;
+    if (!user || !query || playerPicks[index]) return;
     searchPlayers(query).then((list) => resolveExact(index, query, list)).catch(() => {});
   };
 
@@ -157,10 +169,11 @@ function HomeContent() {
     setNameError('');
     try {
       const result = await saveOwnDisplayName(nameInput);
-      if (result === 'taken') setNameError('Bu görünen ad başka bir oyuncu tarafından kullanılıyor');
-      else if (result === 'invalid') setNameError('Görünen ad geçersiz');
+      if (result === 'invalid') setNameError('Görünen ad geçersiz');
       else {
-        setOwnName(nameInput.trim());
+        const profile = await fetchOwnProfile(user.id);
+        setOwnName(profile?.display_name ?? nameInput.trim());
+        setOwnTag(profile?.tag ?? null);
       }
     } catch (error) {
       console.error('Görünen ad kaydedilemedi:', error);
@@ -188,25 +201,35 @@ function HomeContent() {
   };
 
   // Hesaba bağlanmayan isim misafir sayılır
-  const resolvedPlayers = playerNames.map((name, i) => ({
-    name: name.trim().replace(/\s+/g, ' '),
-    id: user ? playerIds[i] : null,
-  }));
+  const resolvedPlayers = playerNames.map((name, i) => {
+    const pick = user ? playerPicks[i] : null;
+    return { name: pick ? pick.display_name : name.trim().replace(/\s+/g, ' '), id: pick?.id ?? null };
+  });
 
+  // Aynı hesap iki kez, aynı adlı iki misafir, ya da bir hesapla aynı adı taşıyan misafir olamaz.
+  // Aynı adlı iki farklı hesap olabilir (masada etiketleriyle ayrılırlar).
   const hasDuplicateNames = (() => {
-    const keys = resolvedPlayers.map((p) => normalizeName(p.name)).filter(Boolean);
-    return new Set(keys).size !== keys.length;
+    const ids = resolvedPlayers.filter((p) => p.id).map((p) => p.id);
+    const guestKeys = resolvedPlayers.filter((p) => !p.id && p.name).map((p) => normalizeName(p.name));
+    const registeredKeys = new Set(resolvedPlayers.filter((p) => p.id).map((p) => normalizeName(p.name)));
+    return new Set(ids).size !== ids.length
+      || new Set(guestKeys).size !== guestKeys.length
+      || guestKeys.some((k) => registeredKeys.has(k));
   })();
 
   const allNamesFilled = playerNames.every((n) => n.trim());
   const teamsFilled = gameMode !== 'group' || (group1Name.trim() && group2Name.trim());
-  const rankedProblem = !isRanked ? null
+  const guestWithHash = resolvedPlayers.some((p) => !p.id && p.name.includes('#'));
+  const ambiguousIndex = resolvedPlayers.findIndex((p, i) => !p.id && ambiguousSeats[i]);
+  const setupProblem = guestWithHash ? 'Etiketli oyuncu bulunamadı; listeden seç'
+    : ambiguousIndex >= 0 ? `"${resolvedPlayers[ambiguousIndex].name}" adında birden çok oyuncu var; listeden doğru kişiyi seç`
+    : !isRanked ? null
     : !ownName ? 'Dereceli oyun için önce görünen adını belirle'
     : resolvedPlayers.some((p) => p.name && !p.id) ? 'Dereceli oyunda 4 oyuncunun da hesabı olmalı'
     : allNamesFilled && !resolvedPlayers.some((p) => p.id === user?.id) ? 'Dereceli oyunu masadaki biri kurmalı (kendini ekle)'
     : null;
 
-  const canStartGame = !!gameMode && allNamesFilled && !!teamsFilled && !hasDuplicateNames && !rankedProblem;
+  const canStartGame = !!gameMode && allNamesFilled && !!teamsFilled && !hasDuplicateNames && !setupProblem;
 
   const handleStartGame = async () => {
     if (!canStartGame || isStarting || !gameMode) return;
@@ -232,14 +255,16 @@ function HomeContent() {
     }
   };
 
-  const hints = seatHint(!!ownName && normalizeName(playerNames[0]) === normalizeName(ownName));
+  const hints = seatHint(!!user && playerPicks[0]?.id === user.id);
 
   const playerTag = (index: number) => {
     if (!playerNames[index].trim() || !user) return null;
-    const registered = !!resolvedPlayers[index].id;
+    const pick = playerPicks[index];
+    const ambiguous = !pick && ambiguousSeats[index];
     return (
-      <span className={`w-14 flex-shrink-0 text-[10px] font-semibold text-right ${registered ? 'text-agreen' : isRanked ? 'text-ared' : 'text-l4'}`}>
-        {registered ? 'Kayıtlı' : 'Misafir'}
+      <span className={`w-14 flex-shrink-0 text-[10px] font-semibold text-right ${
+        pick ? 'text-agreen' : ambiguous ? 'text-ayellow' : isRanked ? 'text-ared' : 'text-l4'}`}>
+        {pick ? formatTag(pick.tag) : ambiguous ? 'Listeden seç' : 'Misafir'}
       </span>
     );
   };
@@ -269,10 +294,10 @@ function HomeContent() {
                   autoComplete="off"
                   placeholder={`Oyuncu ${idx + 1}`}
                   value={playerNames[idx]}
-                  onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setPlayer(idx, e.target.value, null); }}
+                  onChange={(e) => { if (PLAYER_INPUT_REGEX.test(e.target.value)) setPlayer(idx, e.target.value, null); }}
                   onFocus={() => setActiveInput(idx)}
                   onBlur={() => handlePlayerBlur(idx)}
-                  maxLength={20}
+                  maxLength={26}
                   className={`${inputBase} ${team === 1 ? 'border-[var(--team1-border)]' : team === 2 ? 'border-[var(--team2-border)]' : 'border-sep'}`}
                 />
                 {activeInput === idx && suggestions.length > 0 && (
@@ -283,10 +308,10 @@ function HomeContent() {
                         type="button"
                         // Seçim, kutudan çıkış (blur) olayından önce işlensin
                         onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => { setPlayer(idx, p.display_name, p.id); setSuggestions([]); setActiveInput(null); }}
+                        onClick={() => { setPlayer(idx, p.display_name, p); setSuggestions([]); setActiveInput(null); }}
                         className="w-full text-left px-4 py-3 text-sm text-l1 border-t border-sep first:border-t-0 active:bg-s2 hover:bg-s2"
                       >
-                        {p.display_name}
+                        {p.display_name} <span className="text-l4">{formatTag(p.tag)}</span>
                       </button>
                     ))}
                   </div>
@@ -463,7 +488,7 @@ function HomeContent() {
           <h1 className="text-4xl font-black text-l1 tracking-tight">101 Oyunu</h1>
           {ownName && user ? (
             <Link href={`/player?id=${user.id}`} className="text-l3 text-sm mt-1 inline-flex items-center gap-1">
-              Merhaba {ownName} · <span className="text-ablue font-medium">İstatistiklerim</span>
+              Merhaba {nameWithTag(ownName, ownTag)} · <span className="text-ablue font-medium">İstatistiklerim</span>
             </Link>
           ) : (
             <p className="text-l3 text-sm mt-1">Dijital skor takibi</p>
@@ -475,7 +500,7 @@ function HomeContent() {
           <div className="mb-6 p-4 bg-s1 border border-[var(--warn-border)] rounded-2xl">
             <p className="text-l1 text-sm font-semibold mb-1">Görünen adını belirle</p>
             <p className="text-l3 text-xs mb-3 leading-relaxed">
-              Arkadaşların seni oyunlara bu adla ekler; sıralamada da bu ad görünür.
+              Arkadaşların seni oyunlara bu adla ekler. Adının yanına 4 haneli bir etiket eklenir (ör. Oğuzhan #1889); aynı adı başkası da kullanabilir.
             </p>
             <div className="flex gap-2">
               <input
@@ -639,9 +664,9 @@ function HomeContent() {
               {gameMode === 'group' && ' · takım arkadaşları karşılıklı oturur'}
             </p>
             {playerRows}
-            {(hasDuplicateNames || rankedProblem) && (
+            {(hasDuplicateNames || setupProblem) && (
               <p className="text-xs mt-3 leading-relaxed text-ared">
-                {hasDuplicateNames ? 'Aynı oyuncu iki kez eklenmiş' : rankedProblem}
+                {hasDuplicateNames ? 'Aynı oyuncu iki kez eklenmiş' : setupProblem}
               </p>
             )}
           </div>

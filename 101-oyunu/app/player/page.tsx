@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { GameMode, ModeStats, PlayerStats, fetchPlayerStats } from '@/lib/gameApi';
+import { nameWithTag } from '@/lib/players';
 
 const PROVISIONAL_GAMES = 10; // rating_config.provisional_games ile aynı
 
@@ -58,7 +59,7 @@ function PlayerContent() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <h1 className="flex-1 text-center text-l1 font-bold text-base truncate">{stats?.display_name ?? 'Oyuncu'}</h1>
+          <h1 className="flex-1 text-center text-l1 font-bold text-base truncate">{stats?.display_name ? nameWithTag(stats.display_name, stats.tag) : 'Oyuncu'}</h1>
           <ThemeToggle />
         </div>
       </div>
@@ -98,7 +99,7 @@ function PlayerContent() {
                     <div className="text-[10px] text-l3 uppercase tracking-widest">Elo</div>
                     <div className="text-xl font-black text-l1 mt-0.5 tabular-nums">{m.rating === null ? '—' : fmt(m.rating, 0)}</div>
                     <div className="text-[10px] text-l4">
-                      {m.rated_games === null ? 'dereceli yok' : m.rated_games < PROVISIONAL_GAMES ? 'yerleşiyor' : `${m.rated_games} dereceli`}
+                      {m.rated_games === null ? 'dereceli yok' : m.rated_games < PROVISIONAL_GAMES ? `ilk ${PROVISIONAL_GAMES} oyun: ${m.rated_games}/${PROVISIONAL_GAMES}` : `${m.rated_games} dereceli`}
                     </div>
                   </div>
                   <div className="bg-s1 border border-sep rounded-2xl px-3 py-3 text-center">

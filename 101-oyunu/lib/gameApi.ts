@@ -211,6 +211,7 @@ export async function fetchMyActiveGames(): Promise<ActiveGameRow[]> {
 export interface LeaderboardRow {
   user_id: string;
   display_name: string;
+  tag: number | null;
   rating: number;
   games_played: number;
 }
@@ -275,6 +276,7 @@ export interface RecentGame {
 export interface PlayerStats {
   user_id: string;
   display_name: string | null;
+  tag: number | null;
   modes: Partial<Record<GameMode, ModeStats>>;
   recent: RecentGame[];
 }

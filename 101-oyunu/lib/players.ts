@@ -3,9 +3,20 @@ import { supabase } from '@/lib/supabase';
 export interface RegisteredPlayer {
   id: string;
   display_name: string;
+  tag: number;
 }
 
+/** Etiketin gösterimi: 7 → "#0007" */
+export const formatTag = (tag: number | null | undefined) =>
+  tag === null || tag === undefined ? '' : `#${String(tag).padStart(4, '0')}`;
+
+/** "Oğuzhan #1889" */
+export const nameWithTag = (name: string, tag: number | null | undefined) =>
+  tag === null || tag === undefined ? name : `${name} ${formatTag(tag)}`;
+
 export const NAME_REGEX = /^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/;
+/** Oyuncu ekleme kutusu: "deniz #18" gibi etiketle arama için # de yazılabilir */
+export const PLAYER_INPUT_REGEX = /^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., #]*$/;
 export const DISPLAY_NAME_MIN = 2;
 export const DISPLAY_NAME_MAX = 20;
 
@@ -23,35 +34,34 @@ export function validateDisplayName(name: string): string | null {
   return null;
 }
 
-export async function isDisplayNameAvailable(name: string): Promise<boolean> {
-  if (!supabase) return true;
-  const { data, error } = await supabase.rpc('is_display_name_available', { p_name: name.trim() });
-  if (error) throw error;
-  return data === true;
+
+export interface OwnProfile {
+  display_name: string | null;
+  tag: number | null;
 }
 
-export async function fetchOwnDisplayName(userId: string): Promise<string | null> {
+export async function fetchOwnProfile(userId: string): Promise<OwnProfile | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('profiles')
-    .select('display_name')
+    .select('display_name, tag')
     .eq('id', userId)
     .maybeSingle();
   if (error) throw error;
-  return data?.display_name ?? null;
+  return data ?? null;
 }
 
-/** Kendi görünen adını kaydeder; ad başkası tarafından alınmışsa 'taken' döner */
-export async function saveOwnDisplayName(name: string): Promise<'ok' | 'taken' | 'invalid'> {
+/** Kendi görünen adını kaydeder (aynı adı başkası da kullanabilir; etiket ayırır) */
+export async function saveOwnDisplayName(name: string): Promise<'ok' | 'invalid'> {
   if (!supabase) throw new Error('Supabase hazır değil');
   const { data, error } = await supabase.rpc('set_display_name', { p_name: name.trim() });
   if (error) throw error;
-  return data as 'ok' | 'taken' | 'invalid';
+  return data as 'ok' | 'invalid';
 }
 
 export const PLAYER_SUGGESTION_LIMIT = 5;
 
-/** Ada göre kayıtlı oyuncu arar (sunucuda; en fazla 5 sonuç, tam eşleşme önce) */
+/** Ada göre kayıtlı oyuncu arar (sunucuda; en fazla 5 sonuç, tam eşleşme önce; "ad #12" etiketle de arar) */
 export async function searchPlayers(query: string): Promise<RegisteredPlayer[]> {
   if (!supabase || !query.trim()) return [];
   const { data, error } = await supabase.rpc('search_players', { p_query: query, p_limit: PLAYER_SUGGESTION_LIMIT });

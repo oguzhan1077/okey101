@@ -13,6 +13,222 @@
 -- 4. get_player_stats: sıralamada oyuncuya tıklayınca gösterilen istatistikler.
 -- 5. Davetler 5 dakikada yanıtlanmazsa süresi dolar (expired); dereceli oyun iptal olur.
 -- 6. Oyuncu arama sunucuda (en fazla 5 öneri), sıralama sayfalı (10'ar).
+-- 0. Kullanıcı etiketi: aynı adı birden çok kişi alabilir, 'Oğuzhan #1889' gibi
+--    4 haneli etiketle ayrılır. Benzersizlik = ad (Türkçe harf duyarsız) + etiket.
+
+-- ── 0. Kullanıcı etiketi (#1234) ────────────────────────────────────────────
+-- Görünen ad artık benzersiz değil; ad + 4 haneli etiket benzersiz. Etiket kayıtta rastgele
+-- verilir, ad değişince mümkünse korunur. Masada sadece ad görünür; arama, sıralama, profil
+-- ve davetlerde etiketle birlikte gösterilir.
+
+-- Türkçe büyük/küçük harf duyarsız karşılaştırma anahtarı (İ→i, I→ı)
+CREATE OR REPLACE FUNCTION public.name_key(p TEXT)
+RETURNS TEXT
+LANGUAGE sql IMMUTABLE
+AS $$
+  SELECT lower(translate(trim(regexp_replace(coalesce(p, ''), '\s+', ' ', 'g')), 'İIĞÜŞÖÇ', 'iığüşöç'));
+$$;
+
+ALTER TABLE profiles ADD COLUMN tag SMALLINT CHECK (tag BETWEEN 0 AND 9999);
+COMMENT ON COLUMN profiles.tag IS 'Aynı adı taşıyanları ayıran 4 haneli etiket: Oğuzhan #1889';
+
+-- Bu ad için boştaki rastgele bir etiket
+CREATE OR REPLACE FUNCTION public.free_tag(p_name TEXT, p_except UUID DEFAULT NULL)
+RETURNS SMALLINT
+LANGUAGE plpgsql VOLATILE SET search_path = public
+AS $$
+DECLARE
+  v_tag SMALLINT;
+  i INT;
+BEGIN
+  FOR i IN 1..200 LOOP
+    v_tag := floor(random() * 10000)::SMALLINT;
+    IF NOT EXISTS (SELECT 1 FROM profiles
+                   WHERE name_key(display_name) = name_key(p_name) AND tag = v_tag
+                     AND (p_except IS NULL OR id <> p_except)) THEN
+      RETURN v_tag;
+    END IF;
+  END LOOP;
+  RAISE EXCEPTION 'Bu ad için boş etiket bulunamadı, başka bir ad deneyin';
+END;
+$$;
+
+-- Mevcut hesaplara etiket
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN SELECT id, display_name FROM profiles WHERE display_name IS NOT NULL ORDER BY created_at LOOP
+    UPDATE profiles SET tag = free_tag(r.display_name, r.id) WHERE id = r.id;
+  END LOOP;
+END $$;
+
+DROP INDEX profiles_display_name_unique;
+CREATE UNIQUE INDEX profiles_name_tag_unique ON profiles (name_key(display_name), tag) WHERE display_name IS NOT NULL;
+ALTER TABLE profiles ADD CONSTRAINT profiles_name_has_tag CHECK (display_name IS NULL OR tag IS NOT NULL);
+
+-- Kayıt: ad geçerliyse etiketle birlikte yazılır (ad artık "alınmış" olamaz)
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_name TEXT := nullif(trim(regexp_replace(NEW.raw_user_meta_data ->> 'display_name', '\s+', ' ', 'g')), '');
+  i INT;
+BEGIN
+  IF NOT valid_display_name(v_name) THEN v_name := NULL; END IF;
+  FOR i IN 1..5 LOOP  -- aynı anda aynı ad + etiket gelirse tekrar dene
+    BEGIN
+      INSERT INTO profiles (id, display_name, tag)
+      VALUES (NEW.id, v_name, CASE WHEN v_name IS NOT NULL THEN free_tag(v_name) END)
+      ON CONFLICT (id) DO NOTHING;
+      RETURN NEW;
+    EXCEPTION WHEN unique_violation THEN
+      NULL;
+    END;
+  END LOOP;
+  INSERT INTO profiles (id) VALUES (NEW.id) ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+-- Görünen adı belirle/değiştir: 'ok' | 'invalid'. Etiket, yeni adla çakışmıyorsa korunur.
+CREATE OR REPLACE FUNCTION public.set_display_name(p_name TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_uid UUID := auth.uid();
+  v_name TEXT := trim(regexp_replace(p_name, '\s+', ' ', 'g'));
+  v_tag SMALLINT;
+  i INT;
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Giriş yapmalısın'; END IF;
+  IF NOT valid_display_name(v_name) THEN RETURN 'invalid'; END IF;
+  SELECT tag INTO v_tag FROM profiles WHERE id = v_uid;
+  IF v_tag IS NULL OR EXISTS (SELECT 1 FROM profiles
+                              WHERE name_key(display_name) = name_key(v_name) AND tag = v_tag AND id <> v_uid) THEN
+    v_tag := free_tag(v_name, v_uid);
+  END IF;
+  FOR i IN 1..5 LOOP
+    BEGIN
+      INSERT INTO profiles (id, display_name, tag) VALUES (v_uid, v_name, v_tag)
+      ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name, tag = EXCLUDED.tag, updated_at = now();
+      RETURN 'ok';
+    EXCEPTION WHEN unique_violation THEN
+      v_tag := free_tag(v_name, v_uid);
+    END;
+  END LOOP;
+  RAISE EXCEPTION 'Görünen ad kaydedilemedi, tekrar deneyin';
+END;
+$$;
+
+-- Ad artık her zaman alınabilir (etiket ayırır); eski arayüz uyumluluğu için duruyor
+CREATE OR REPLACE FUNCTION public.is_display_name_available(p_name TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT true;
+$$;
+
+CREATE OR REPLACE FUNCTION public.create_game(
+  p_mode TEXT,
+  p_is_ranked BOOLEAN,
+  p_players JSONB,
+  p_first_dealer_seat SMALLINT DEFAULT 0,
+  p_team1_name TEXT DEFAULT NULL,
+  p_team2_name TEXT DEFAULT NULL,
+  p_meta JSONB DEFAULT '{}'
+)
+RETURNS UUID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_uid UUID := auth.uid();
+  v_game_id UUID;
+  v_rules JSONB;
+  v_user UUID;
+  v_guest TEXT;
+  v_name TEXT;
+  v_creator_in BOOLEAN := false;
+  i INT;
+BEGIN
+  IF p_mode NOT IN ('single', 'group') THEN RAISE EXCEPTION 'Geçersiz oyun modu'; END IF;
+  IF jsonb_typeof(p_players) <> 'array' OR jsonb_array_length(p_players) <> 4 THEN
+    RAISE EXCEPTION '4 oyuncu gerekli';
+  END IF;
+  IF p_first_dealer_seat NOT BETWEEN 0 AND 3 THEN RAISE EXCEPTION 'Geçersiz dağıtan koltuk'; END IF;
+  IF p_mode = 'group' AND (nullif(trim(p_team1_name), '') IS NULL OR nullif(trim(p_team2_name), '') IS NULL) THEN
+    RAISE EXCEPTION 'Grup oyununda takım adları gerekli';
+  END IF;
+  IF p_is_ranked AND v_uid IS NULL THEN RAISE EXCEPTION 'Dereceli oyun için giriş yapmalısın'; END IF;
+
+  SELECT rules INTO v_rules FROM rating_config WHERE id = 1;
+
+  p_meta := CASE WHEN jsonb_typeof(p_meta) = 'object' THEN p_meta ELSE '{}' END;
+
+  INSERT INTO games (mode, is_ranked, status, created_by, team1_name, team2_name, first_dealer_seat, rules, started_at,
+                     setup_started_at, client_created_at, client_timezone, device_id, app_version, client_meta)
+  VALUES (p_mode, p_is_ranked,
+          CASE WHEN p_is_ranked THEN 'pending' ELSE 'active' END,
+          v_uid,
+          CASE WHEN p_mode = 'group' THEN trim(p_team1_name) END,
+          CASE WHEN p_mode = 'group' THEN trim(p_team2_name) END,
+          p_first_dealer_seat, v_rules,
+          CASE WHEN p_is_ranked THEN NULL ELSE now() END,
+          meta_time(p_meta, 'setup_started_at'), meta_time(p_meta, 'client_created_at'),
+          meta_text(p_meta, 'timezone', 64), meta_text(p_meta, 'device_id', 64), meta_text(p_meta, 'app_version', 40),
+          -- Kalan küçük alanlar (tarayıcı, ekran, dil); boyut sınırlı
+          CASE WHEN length((p_meta - 'setup_started_at' - 'client_created_at' - 'timezone' - 'device_id' - 'app_version')::TEXT) <= 2000
+               THEN p_meta - 'setup_started_at' - 'client_created_at' - 'timezone' - 'device_id' - 'app_version'
+               ELSE '{}' END)
+  RETURNING id INTO v_game_id;
+
+  FOR i IN 0..3 LOOP
+    v_user := nullif(p_players -> i ->> 'user_id', '')::UUID;
+    v_guest := nullif(trim(regexp_replace(p_players -> i ->> 'guest_name', '\s+', ' ', 'g')), '');
+
+    IF v_user IS NOT NULL THEN
+      SELECT display_name INTO v_name FROM profiles
+      WHERE id = v_user AND display_name IS NOT NULL AND deleted_at IS NULL;
+      IF v_name IS NULL THEN RAISE EXCEPTION '%. oyuncunun hesabı veya görünen adı yok', i + 1; END IF;
+      IF v_user = v_uid THEN v_creator_in := true; END IF;
+    ELSIF p_is_ranked THEN
+      RAISE EXCEPTION 'Dereceli oyunda 4 oyuncunun da hesabı olmalı';
+    ELSIF v_guest IS NULL OR length(v_guest) > 20 THEN
+      RAISE EXCEPTION '%. oyuncunun adı geçersiz', i + 1;
+    ELSE
+      v_name := v_guest;
+    END IF;
+
+    INSERT INTO game_players (game_id, seat, team, user_id, name, invite_status, responded_at)
+    VALUES (v_game_id, i,
+            CASE WHEN p_mode = 'group' THEN (i % 2) + 1 END,
+            v_user, v_name,
+            CASE WHEN v_user IS NULL THEN 'guest'
+                 WHEN v_user = v_uid THEN 'accepted'
+                 ELSE 'pending' END,
+            CASE WHEN v_user = v_uid THEN now() END);
+  END LOOP;
+  -- Aynı hesap iki koltukta: game_players UNIQUE (game_id, user_id) hata verir
+
+  IF p_is_ranked AND NOT v_creator_in THEN
+    RAISE EXCEPTION 'Oyunu kuran kişi de oyuncular arasında olmalı';
+  END IF;
+
+  -- Masada aynı adda iki kişi varsa (ör. iki Oğuzhan) hesaplıların adına etiket eklenir
+  UPDATE game_players gp
+  SET name = gp.name || ' #' || lpad(p.tag::TEXT, 4, '0')
+  FROM profiles p
+  WHERE gp.game_id = v_game_id AND p.id = gp.user_id
+    AND (SELECT count(*) FROM game_players x
+         WHERE x.game_id = v_game_id AND name_key(x.name) = name_key(gp.name)) > 1;
+
+  RETURN v_game_id;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.name_key(TEXT), public.free_tag(TEXT, UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.name_key(TEXT) TO anon, authenticated;
 
 -- ── 1–2. Yazma yetkisi ve iptal ─────────────────────────────────────────────
 
@@ -360,6 +576,7 @@ AS $$
   SELECT jsonb_build_object(
     'user_id', p.id,
     'display_name', p.display_name,
+    'tag', p.tag,
     'modes', coalesce((
       SELECT jsonb_object_agg(gs.mode,
                (to_jsonb(gs) - 'mode') || coalesce(to_jsonb(rst) - 'mode', '{}'::jsonb)
@@ -483,7 +700,7 @@ AS $$
 BEGIN
   PERFORM expire_pending_invites();
   RETURN QUERY
-  SELECT g.id, g.mode, g.is_ranked, cp.display_name,
+  SELECT g.id, g.mode, g.is_ranked, cp.display_name || ' #' || lpad(cp.tag::TEXT, 4, '0'),
          (SELECT array_agg(x.name ORDER BY x.seat) FROM game_players x WHERE x.game_id = g.id),
          g.created_at,
          g.created_at + make_interval(mins => (SELECT invite_timeout_minutes FROM rating_config WHERE id = 1))
@@ -527,39 +744,36 @@ GRANT EXECUTE ON FUNCTION public.my_invites() TO authenticated;
 -- ve sıralama sayfa sayfa (10'ar) okunur. Eski list_players/get_leaderboard, yeni arayüz
 -- yayına çıkana kadar eski sürüm kullandığı için duruyor.
 
--- Türkçe büyük/küçük harf duyarsız karşılaştırma anahtarı (İ→i, I→ı)
-CREATE OR REPLACE FUNCTION public.name_key(p TEXT)
-RETURNS TEXT
-LANGUAGE sql IMMUTABLE
-AS $$
-  SELECT lower(translate(trim(regexp_replace(coalesce(p, ''), '\s+', ' ', 'g')), 'İIĞÜŞÖÇ', 'iığüşöç'));
-$$;
-
--- Ada göre oyuncu arama: önce tam eşleşme, sonra başı uyanlar, sonra içinde geçenler
+-- Ada göre oyuncu arama: önce tam eşleşme, sonra başı uyanlar, sonra içinde geçenler.
+-- "oğuzhan #18" yazılırsa etiketi 18 ile başlayanlar.
 CREATE OR REPLACE FUNCTION public.search_players(p_query TEXT, p_limit INTEGER DEFAULT 5)
-RETURNS TABLE (id UUID, display_name TEXT)
+RETURNS TABLE (id UUID, display_name TEXT, tag SMALLINT)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
 AS $$
-  WITH q AS (SELECT name_key(p_query) AS k)
-  SELECT p.id, p.display_name
+  WITH q AS (
+    SELECT name_key(split_part(coalesce(p_query, ''), '#', 1)) AS k,
+           nullif(regexp_replace(split_part(coalesce(p_query, ''), '#', 2), '[^0-9]', '', 'g'), '') AS t
+  )
+  SELECT p.id, p.display_name, p.tag
   FROM profiles p, q
   WHERE q.k <> ''
     AND p.display_name IS NOT NULL AND p.deleted_at IS NULL
     AND position(q.k IN name_key(p.display_name)) > 0
+    AND (q.t IS NULL OR starts_with(lpad(p.tag::TEXT, 4, '0'), q.t))
   ORDER BY name_key(p.display_name) = q.k DESC,
            starts_with(name_key(p.display_name), q.k) DESC,
-           p.display_name
+           p.display_name, p.tag
   LIMIT least(greatest(coalesce(p_limit, 5), 1), 10);
 $$;
 
 -- Sayfalı sıralama; rank tüm listedeki sıra, total_count toplam oyuncu sayısı
 CREATE OR REPLACE FUNCTION public.get_leaderboard_page(p_mode TEXT, p_limit INTEGER DEFAULT 10, p_offset INTEGER DEFAULT 0)
-RETURNS TABLE (rank BIGINT, user_id UUID, display_name TEXT, rating NUMERIC, games_played INTEGER, total_count BIGINT)
+RETURNS TABLE (rank BIGINT, user_id UUID, display_name TEXT, tag SMALLINT, rating NUMERIC, games_played INTEGER, total_count BIGINT)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
 AS $$
   WITH ranked AS (
     SELECT row_number() OVER (ORDER BY r.rating DESC, r.games_played DESC, p.display_name) AS rank,
-           r.user_id, p.display_name, round(r.rating) AS rating, r.games_played,
+           r.user_id, p.display_name, p.tag, round(r.rating) AS rating, r.games_played,
            count(*) OVER () AS total_count
     FROM player_ratings r
     JOIN profiles p ON p.id = r.user_id
@@ -586,10 +800,9 @@ AS $$
   WHERE x.user_id = p_user_id;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.name_key(TEXT), public.search_players(TEXT, INTEGER),
+REVOKE EXECUTE ON FUNCTION public.search_players(TEXT, INTEGER),
   public.get_leaderboard_page(TEXT, INTEGER, INTEGER), public.get_player_rank(TEXT, UUID)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.name_key(TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.search_players(TEXT, INTEGER) TO authenticated;   -- oyuncu eklemek giriş ister
 GRANT EXECUTE ON FUNCTION public.get_leaderboard_page(TEXT, INTEGER, INTEGER) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_player_rank(TEXT, UUID) TO anon, authenticated;
