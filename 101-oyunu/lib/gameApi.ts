@@ -254,11 +254,14 @@ export interface ModeStats {
   rated_games: number | null;
 }
 
+// Kendi profilinde: tarihli, hepsi açılabilir. Başkasının profilinde: tarihsiz özet;
+// sadece birlikte oynanan oyunun numarası gelir (can_open).
 export interface RecentGame {
-  game_id: string;
+  game_id: string | null;
+  can_open: boolean;
   mode: GameMode;
   is_ranked: boolean;
-  ended_at: string;
+  ended_at: string | null;
   round_count: number;
   place: number;
   final_score: number;

@@ -9,7 +9,8 @@
 --    Cihaz kimliği (games.device_id) dışarıdan okunamaz.
 -- 3. Oyun verisi gizli: oyun tablolarına doğrudan okuma kapatıldı. Bir oyunu sadece oyuncuları
 --    (davetliler dahil), kuranı ve (misafir oyununda) kuran cihaz görür: get_game().
---    Sıralama ve toplu istatistikler açık kalır; "son oyunlar" sadece oyuncunun kendisine.
+--    Sıralama ve toplu istatistikler açık kalır. Başkasının profilinde son 5 oyun özeti
+--    (tarihsiz, rakipsiz); sadece birlikte oynanan oyun açılabilir.
 -- 4. Artık kullanılmayan list_players ve get_leaderboard kaldırıldı.
 
 -- ── 1. Okey modeli sadece dereceli oyunlardan ───────────────────────────────
@@ -658,16 +659,30 @@ AS $$
       SELECT jsonb_object_agg(br.mode, (to_jsonb(br) - 'mode') || coalesce(to_jsonb(bg) - 'mode', '{}'::jsonb))
       FROM baseline_rounds br
       LEFT JOIN baseline_games bg ON bg.mode = br.mode), '{}'::jsonb),
+    -- Son oyunlar, her mod için ayrı:
+    --   kendisi: son 10, tarihli, hepsi açılabilir
+    --   başkası: son 5 özet (sıra, puan, beceri, Elo); tarih ve rakip yok. Sadece birlikte
+    --   oynanan oyun açılabilir (game_id sadece onlarda döner). Kim kiminle ne zaman: gizli.
     'recent', coalesce((
-      SELECT jsonb_agg(x ORDER BY x.ended_at DESC)
-      FROM (SELECT mg.id AS game_id, mg.mode, mg.is_ranked, mg.ended_at, mg.round_count,
-                   gr.place, gr.final_score, round(gr.skill_score) AS skill,
-                   round(gr.rating_after - gr.rating_before, 1) AS rating_delta
+      SELECT jsonb_agg(to_jsonb(x) - 'ord' - 'is_self' ORDER BY x.mode, x.ord)
+      FROM (SELECT CASE WHEN v.can_open THEN mg.id END AS game_id,
+                   mg.mode, mg.is_ranked,
+                   CASE WHEN v.is_self THEN mg.ended_at END AS ended_at,
+                   mg.round_count, gr.place, gr.final_score, round(gr.skill_score) AS skill,
+                   round(gr.rating_after - gr.rating_before, 1) AS rating_delta,
+                   v.can_open,
+                   row_number() OVER (PARTITION BY mg.mode ORDER BY mg.ended_at DESC) AS ord,
+                   v.is_self
             FROM my_games mg
             JOIN game_results gr ON gr.game_id = mg.id AND gr.seat = mg.seat
-            WHERE auth.uid() = p_user_id   -- ne zaman oynadığı sadece kendisine görünür
-            ORDER BY mg.ended_at DESC
-            LIMIT 10) x), '[]'::jsonb))
+            CROSS JOIN LATERAL (
+              SELECT auth.uid() = p_user_id IS TRUE AS is_self,
+                     (auth.uid() = p_user_id IS TRUE)
+                     OR EXISTS (SELECT 1 FROM game_players gp2
+                                WHERE gp2.game_id = mg.id AND gp2.user_id = auth.uid()) AS can_open
+            ) v
+           ) x
+      WHERE x.ord <= CASE WHEN x.is_self THEN 10 ELSE 5 END), '[]'::jsonb))
   FROM profiles p
   WHERE p.id = p_user_id AND p.deleted_at IS NULL;
 $$;

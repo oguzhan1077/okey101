@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { useAuth } from '@/context/AuthContext';
 import { GameMode, ModeBaseline, ModeStats, PlayerStats, fetchPlayerStats } from '@/lib/gameApi';
 import { nameWithTag } from '@/lib/players';
 import { Badge, BADGE_LABELS } from '@/components/Badge';
@@ -45,6 +46,8 @@ function PlayerContent() {
   const userId = useSearchParams().get('id');
   const [stats, setStats] = useState<PlayerStats | null | undefined>(undefined);
   const [mode, setMode] = useState<GameMode>('single');
+  const { user } = useAuth();
+  const isSelf = !!user && user.id === userId;
 
   useEffect(() => {
     if (!userId) { setStats(null); return; }
@@ -187,30 +190,47 @@ function PlayerContent() {
                 {/* Son oyunlar */}
                 {recent.length > 0 && (
                   <>
-                    <p className="text-l3 text-xs font-semibold uppercase tracking-wider mb-2">Son oyunlar</p>
+                    <p className="text-l3 text-xs font-semibold uppercase tracking-wider mb-2">
+                      {isSelf ? 'Son oyunlar' : `Son ${recent.length} oyun`}
+                    </p>
                     <div className="bg-s1 border border-sep rounded-2xl overflow-hidden">
-                      {recent.map((g) => (
-                        <Link
-                          key={g.game_id}
-                          href={`/game?id=${g.game_id}`}
-                          className="flex items-center gap-3 px-4 py-3 border-t border-sep first:border-t-0 active:bg-s2"
-                        >
-                          <span className={`w-7 text-center text-sm font-bold ${g.place === 1 ? 'text-ablue' : 'text-l3'}`}>{g.place}.</span>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-l2 text-sm">
-                              {new Date(g.ended_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-                              <span className="text-l4"> · {g.round_count} round{g.is_ranked ? '' : ' · derecesiz'}</span>
+                      {recent.map((g, i) => {
+                        const row = (
+                          <>
+                            <span className={`w-7 text-center text-sm font-bold ${g.place === 1 ? 'text-ablue' : 'text-l3'}`}>{g.place}.</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-l2 text-sm">
+                                {g.ended_at
+                                  ? new Date(g.ended_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })
+                                  : `${fmt(g.final_score)} puan`}
+                                <span className="text-l4"> · {g.round_count} round{g.is_ranked ? '' : ' · derecesiz'}</span>
+                              </div>
+                              <div className="text-l4 text-[11px]">
+                                {g.ended_at ? `${fmt(g.final_score)} puan · ` : ''}beceri {signed(g.skill, 0)}
+                                {!isSelf && g.can_open ? ' · birlikte oynadınız' : ''}
+                              </div>
                             </div>
-                            <div className="text-l4 text-[11px]">{fmt(g.final_score)} puan · beceri {signed(g.skill, 0)}</div>
-                          </div>
-                          {g.rating_delta !== null && (
-                            <span className={`text-sm font-bold tabular-nums ${g.rating_delta > 0 ? 'text-agreen' : g.rating_delta < 0 ? 'text-ared' : 'text-l3'}`}>
-                              {signed(g.rating_delta, 0)}
-                            </span>
-                          )}
-                        </Link>
-                      ))}
+                            {g.rating_delta !== null && (
+                              <span className={`text-sm font-bold tabular-nums ${g.rating_delta > 0 ? 'text-agreen' : g.rating_delta < 0 ? 'text-ared' : 'text-l3'}`}>
+                                {signed(g.rating_delta, 0)}
+                              </span>
+                            )}
+                          </>
+                        );
+                        const cls = 'flex items-center gap-3 px-4 py-3 border-t border-sep first:border-t-0';
+                        // Sadece içinde olduğun oyun açılabilir; diğerleri özet
+                        return g.can_open && g.game_id ? (
+                          <Link key={g.game_id} href={`/game?id=${g.game_id}`} className={`${cls} active:bg-s2`}>{row}</Link>
+                        ) : (
+                          <div key={`${g.mode}-${i}`} className={cls}>{row}</div>
+                        );
+                      })}
                     </div>
+                    {!isSelf && (
+                      <p className="text-l4 text-[11px] mt-2 leading-relaxed">
+                        Gizlilik için tarih ve rakipler gösterilmez; sadece birlikte oynadığınız oyunlar açılır.
+                      </p>
+                    )}
                   </>
                 )}
               </>
