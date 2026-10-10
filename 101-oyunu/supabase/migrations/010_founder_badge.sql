@@ -1,14 +1,16 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- 010 — Kurucu rozeti ve ayrılmış #0000 etiketi
+-- 010 — Kurucu rozeti ve kilitli #1905 etiketi
 -- ════════════════════════════════════════════════════════════════════════════
 --
--- 1. #0000 rastgele verilmez (etiketler 0001–9999); sadece elle verilir.
+-- 1. #1905 kilitli: rastgele hiç verilmez ve sadece kurucu rozetli hesap taşıyabilir
+--    (veritabanı kuralı; elle verilmeye çalışılsa da reddedilir).
 -- 2. profiles.badge: adın yanında gösterilen rozet ('founder' = kurucu üye).
 --    Kullanıcılar kendilerine veremez (profiles'a yazma yetkisi yok); SQL editöründen verilir.
 -- 3. Rozet; arama, sıralama ve oyuncu istatistiklerinde döner.
--- 4. Sistemin kurucusu Oğuzhan'a #0000 ve kurucu rozeti.
+-- 4. Sistemin kurucusu Oğuzhan'a #1905 ve kurucu rozeti.
+-- Ayrıca set_display_name, kilitli etiketle çakışmaması için UPDATE ile yazacak şekilde düzeltildi.
 
--- ── 1. #0000 ayrılmış ───────────────────────────────────────────────────────
+-- ── 1. #1905 rastgele dağıtımdan çıkar ──────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.free_tag(p_name TEXT, p_except UUID DEFAULT NULL)
 RETURNS SMALLINT
@@ -19,7 +21,8 @@ DECLARE
   i INT;
 BEGIN
   FOR i IN 1..200 LOOP
-    v_tag := (1 + floor(random() * 9999))::SMALLINT;   -- 0001–9999; #0000 ayrılmış
+    v_tag := floor(random() * 10000)::SMALLINT;
+    CONTINUE WHEN v_tag = 1905;   -- kilitli: sadece kurucu
     IF NOT EXISTS (SELECT 1 FROM profiles
                    WHERE name_key(display_name) = name_key(p_name) AND tag = v_tag
                      AND (p_except IS NULL OR id <> p_except)) THEN
@@ -30,8 +33,40 @@ BEGIN
 END;
 $$;
 
--- Ad değişince etiket korunur; ama #0000 sadece rozet sahibinde kalabilir
--- (set_display_name etiketi koruduğu için ek kural gerekmez: #0000'ı başka kimse alamaz)
+-- Ad değiştirme: hesap varsa UPDATE ile yazılır. (009'daki "INSERT ... ON CONFLICT DO UPDATE",
+-- eklenmek istenen satırı rozetsiz gördüğü için #1905 kilidine takılıyordu.)
+CREATE OR REPLACE FUNCTION public.set_display_name(p_name TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_uid UUID := auth.uid();
+  v_name TEXT := trim(regexp_replace(p_name, '\s+', ' ', 'g'));
+  v_tag SMALLINT;
+  i INT;
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Giriş yapmalısın'; END IF;
+  IF NOT valid_display_name(v_name) THEN RETURN 'invalid'; END IF;
+  SELECT tag INTO v_tag FROM profiles WHERE id = v_uid;
+  IF v_tag IS NULL OR EXISTS (SELECT 1 FROM profiles
+                              WHERE name_key(display_name) = name_key(v_name) AND tag = v_tag AND id <> v_uid) THEN
+    v_tag := free_tag(v_name, v_uid);
+  END IF;
+  FOR i IN 1..5 LOOP
+    BEGIN
+      IF EXISTS (SELECT 1 FROM profiles WHERE id = v_uid) THEN
+        UPDATE profiles SET display_name = v_name, tag = v_tag, updated_at = now() WHERE id = v_uid;
+      ELSE
+        INSERT INTO profiles (id, display_name, tag) VALUES (v_uid, v_name, v_tag);
+      END IF;
+      RETURN 'ok';
+    EXCEPTION WHEN unique_violation THEN
+      v_tag := free_tag(v_name, v_uid);
+    END;
+  END LOOP;
+  RAISE EXCEPTION 'Görünen ad kaydedilemedi, tekrar deneyin';
+END;
+$$;
 
 -- ── 2. Rozet ────────────────────────────────────────────────────────────────
 
@@ -160,5 +195,14 @@ GRANT EXECUTE ON FUNCTION public.get_leaderboard_page(TEXT, INTEGER, INTEGER) TO
 -- ── 4. Kurucu ───────────────────────────────────────────────────────────────
 
 UPDATE profiles
-SET tag = 0, badge = 'founder', updated_at = now()
+SET tag = 1905, badge = 'founder', updated_at = now()
 WHERE id = '09423a57-5ba6-4e96-b648-b9b38e660d2f';   -- Oğuzhan (sistemin kurucusu)
+
+-- Şans eseri #1905 almış başka biri varsa yeni etiket verilir, sonra kilit konur
+UPDATE profiles
+SET tag = free_tag(display_name, id), updated_at = now()
+WHERE tag = 1905 AND badge IS DISTINCT FROM 'founder';
+
+ALTER TABLE profiles ADD CONSTRAINT profiles_tag_1905_founder_only
+  -- IS NOT DISTINCT FROM şart: badge NULL iken '= founder' NULL döner ve CHECK NULL'u geçerli sayar
+  CHECK (tag IS DISTINCT FROM 1905 OR badge IS NOT DISTINCT FROM 'founder');
