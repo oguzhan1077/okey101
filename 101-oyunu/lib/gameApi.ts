@@ -203,6 +203,50 @@ export async function fetchLeaderboard(mode: GameMode): Promise<LeaderboardRow[]
   return ((data ?? []) as LeaderboardRow[]).map((r) => ({ ...r, rating: Number(r.rating) }));
 }
 
+export interface ModeStats {
+  games: number;
+  ranked_games: number;
+  wins: number;
+  avg_place: number;
+  avg_game_score: number;
+  skill_per_game: number;
+  rounds: number;
+  avg_round_score: number;
+  okey_per_round: number;
+  finish_pct: number;
+  hand_finishes: number;
+  not_opened_pct: number | null;
+  penalty_per_round: number;
+  skill_per_round: number | null;
+  rating: number | null;
+  rated_games: number | null;
+}
+
+export interface RecentGame {
+  game_id: string;
+  mode: GameMode;
+  is_ranked: boolean;
+  ended_at: string;
+  round_count: number;
+  place: number;
+  final_score: number;
+  skill: number;
+  rating_delta: number | null;
+}
+
+export interface PlayerStats {
+  user_id: string;
+  display_name: string | null;
+  modes: Partial<Record<GameMode, ModeStats>>;
+  recent: RecentGame[];
+}
+
+export async function fetchPlayerStats(userId: string): Promise<PlayerStats | null> {
+  const { data, error } = await db().rpc('get_player_stats', { p_user_id: userId });
+  if (error) throw error;
+  return (data ?? null) as PlayerStats | null;
+}
+
 // ── Oyun kurma, davet, bitirme ────────────────────────────────────────────────
 
 export type NewGamePlayer = { user_id: string } | { guest_name: string };

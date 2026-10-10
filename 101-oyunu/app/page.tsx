@@ -408,7 +408,13 @@ function HomeContent() {
       <div className="px-4 pb-10 max-w-sm mx-auto">
         <div className="mt-7 mb-6">
           <h1 className="text-4xl font-black text-l1 tracking-tight">101 Oyunu</h1>
-          <p className="text-l3 text-sm mt-1">{ownName ? `Merhaba ${ownName}` : 'Dijital skor takibi'}</p>
+          {ownName && user ? (
+            <Link href={`/player?id=${user.id}`} className="text-l3 text-sm mt-1 inline-flex items-center gap-1">
+              Merhaba {ownName} · <span className="text-ablue font-medium">İstatistiklerim</span>
+            </Link>
+          ) : (
+            <p className="text-l3 text-sm mt-1">Dijital skor takibi</p>
+          )}
         </div>
 
         {/* Görünen ad */}
@@ -537,6 +543,7 @@ function HomeContent() {
               {isRanked
                 ? '4 oyuncunun da hesabı olmalı. Herkes kendi telefonundan onaylayınca oyun başlar; sonuç sıralamaya işlenir.'
                 : 'Sıralamaya sayılmaz. Misafir oyuncu eklenebilir; veriler yine kaydedilir.'}
+              {' '}Roundları sen girersin, diğerleri kendi telefonundan izler.
             </p>
           </div>
         )}

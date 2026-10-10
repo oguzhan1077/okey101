@@ -67,7 +67,11 @@ export default function LeaderboardPage() {
             {rows.map((r, i) => {
               const isMe = user?.id === r.user_id;
               return (
-                <div key={r.user_id} className={`flex items-center gap-3 px-4 py-3 ${i ? 'border-t border-sep' : ''} ${isMe ? 'bg-[var(--team1-bg)]' : ''}`}>
+                <Link
+                  key={r.user_id}
+                  href={`/player?id=${r.user_id}`}
+                  className={`flex items-center gap-3 px-4 py-3 active:bg-s2 ${i ? 'border-t border-sep' : ''} ${isMe ? 'bg-[var(--team1-bg)]' : ''}`}
+                >
                   <span className={`w-6 text-center text-sm font-bold ${i < 3 ? 'text-ablue' : 'text-l3'}`}>{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-l1 text-sm font-semibold truncate">{r.display_name}</div>
@@ -76,15 +80,19 @@ export default function LeaderboardPage() {
                     </div>
                   </div>
                   <span className="text-l1 text-base font-bold tabular-nums">{Math.round(r.rating)}</span>
-                </div>
+                  <svg className="w-4 h-4 text-l4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
               );
             })}
           </div>
         )}
 
         <p className="text-l4 text-xs mt-5 leading-relaxed">
-          Herkes 1500 puanla başlar. Sadece 4 oyuncunun da onayladığı dereceli oyunlar sayılır.
-          Puan, okey şansı düşülmüş beceriye göre değişir. İlk {PROVISIONAL_GAMES} oyunda puan daha hızlı oynar.
+          Herkes 1500 puanla başlar; puan 100'ün altına inmez. Sadece 4 oyuncunun da onayladığı dereceli oyunlar sayılır.
+          Puan, okey şansı düşülmüş beceriye göre değişir. İlk {PROVISIONAL_GAMES} oyunda daha hızlı, 2000 ve 2400 üstünde daha yavaş değişir.
+          Oyuncuya dokunarak istatistiklerini görebilirsin.
         </p>
       </div>
     </div>

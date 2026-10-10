@@ -67,7 +67,7 @@ function GamePageContent() {
   const [entryStartedAt, setEntryStartedAt] = useState<string | null>(null);
 
   const [showCalculation, setShowCalculation] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<'finish' | 'abandon' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'finish' | 'cancel' | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState('');
   const [showResults, setShowResults] = useState(false);
@@ -138,10 +138,11 @@ function GamePageContent() {
   const displayOrder = isGroupMode ? [0, 2, 1, 3] : [0, 1, 2, 3];
 
   const mySeat = seats.find((s) => user && s.user_id === user.id);
+  // Tek yazıcı: oyunu kuran kişi (hesapsız kurulan derecesiz oyunda linki bilen cihaz). Diğerleri izler.
   const canWrite = !!game && game.status === 'active' && (
-    mySeat?.invite_status === 'accepted'
-    || (!game.is_ranked && (game.created_by === null || game.created_by === user?.id))
+    game.created_by === null ? !game.is_ranked : game.created_by === user?.id
   );
+  const writerName = seats.find((s) => s.user_id && s.user_id === game?.created_by)?.name;
 
   const nextRoundNo = rounds.length + 1;
   const nextDealer = game ? dealerForRound(game.first_dealer_seat, nextRoundNo) : 0;
@@ -396,7 +397,8 @@ function GamePageContent() {
     }
   };
 
-  const executeAbandon = async () => {
+  // Sadece hiç round girilmemiş oyun iptal edilebilir (başlamış oyun bırakılamaz)
+  const executeCancel = async () => {
     if (!gameId) return;
     setActionBusy(true);
     setActionError('');
@@ -469,7 +471,7 @@ function GamePageContent() {
 
   if (game.status === 'pending' || game.status === 'cancelled') {
     const isCancelled = game.status === 'cancelled';
-    const canCancel = !isCancelled && (game.created_by === user?.id || mySeat?.invite_status === 'accepted');
+    const canCancel = !isCancelled && !!user && game.created_by === user.id;
     return centered(<>
       <div className="flex justify-end mb-4"><ThemeToggle /></div>
       <p className="text-[10px] text-l3 uppercase tracking-widest mb-1">{isGroupMode ? 'Grup' : 'Tekli'} · dereceli</p>
@@ -507,7 +509,7 @@ function GamePageContent() {
         </div>
       )}
       {canCancel && (
-        <button onClick={executeAbandon} disabled={actionBusy}
+        <button onClick={executeCancel} disabled={actionBusy}
           className="w-full mt-5 py-3 rounded-xl bg-[var(--danger-bg)] border border-[var(--danger-border)] text-ared text-sm font-medium disabled:opacity-50">
           Oyunu iptal et
         </button>
@@ -908,12 +910,12 @@ function GamePageContent() {
         )}
         {!canWrite && game.status === 'active' && (
           <p className="text-l4 text-xs text-center px-4">
-            Bu oyunu izliyorsun; roundları masadaki oyuncular giriyor. Skorlar kendiliğinden güncellenir.
+            Bu oyunu izliyorsun; roundları oyunu kuran{writerName ? ` (${writerName})` : ''} giriyor. Skorlar kendiliğinden güncellenir.
           </p>
         )}
 
         {/* Aksiyon Butonları */}
-        <div className={`grid ${canWrite ? 'grid-cols-3' : 'grid-cols-2'} gap-2 pb-4`}>
+        <div className="grid grid-cols-2 gap-2">
           {!isOver && (
             <button
               onClick={() => setShowCalculation((v) => !v)}
@@ -924,24 +926,13 @@ function GamePageContent() {
             </button>
           )}
           {canWrite ? (
-            <>
-              <button
-                onClick={() => { setActionError(''); setConfirmAction('abandon'); }}
-                className="bg-s2 hover:opacity-90 active:scale-[0.97] border border-sep py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
-              >
-                <svg className="w-5 h-5 text-l3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                <span className="text-xs text-l3">Bırak</span>
-              </button>
-              <button
-                onClick={() => { setActionError(''); setConfirmAction('finish'); }}
-                className="bg-[var(--danger-bg)] hover:opacity-90 active:scale-[0.97] border border-[var(--danger-border)] text-ared py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
-              >
-                <FlagIcon />
-                <span className="text-xs">Bitir</span>
-              </button>
-            </>
+            <button
+              onClick={() => { setActionError(''); setConfirmAction('finish'); }}
+              className="bg-[var(--danger-bg)] hover:opacity-90 active:scale-[0.97] border border-[var(--danger-border)] text-ared py-3.5 rounded-xl text-sm font-medium transition-all touch-manipulation flex flex-col items-center gap-1"
+            >
+              <FlagIcon />
+              <span className="text-xs">Bitir</span>
+            </button>
           ) : (
             <button
               onClick={() => router.push('/')}
@@ -951,6 +942,16 @@ function GamePageContent() {
             </button>
           )}
         </div>
+        {/* Yanlış kurulan oyun: ilk round girilmeden iptal edilebilir */}
+        {canWrite && rounds.length === 0 && (
+          <button
+            onClick={() => { setActionError(''); setConfirmAction('cancel'); }}
+            className="w-full py-2 text-l4 text-xs underline underline-offset-2"
+          >
+            Oyunu iptal et
+          </button>
+        )}
+        <div className="pb-4" />
       </div>
 
       {/* ── MODALLER ── */}
@@ -964,12 +965,12 @@ function GamePageContent() {
                 <FlagIcon className={`w-10 h-10 ${confirmAction === 'finish' ? 'text-ared' : 'text-l3'}`} />
               </div>
               <h2 className="text-l1 font-bold text-lg mb-2">
-                {confirmAction === 'finish' ? 'Oyunu Bitir' : 'Oyunu Bırak'}
+                {confirmAction === 'finish' ? 'Oyunu Bitir' : 'Oyunu İptal Et'}
               </h2>
               <p className="text-l3 text-sm mb-5 leading-relaxed">
                 {confirmAction === 'finish'
                   ? `Oyun ${rounds.length} round ile bitirilecek ve sonuçlar hesaplanacak.${game.is_ranked ? ' Sonuç sıralamaya işlenir.' : ''}`
-                  : 'Oyun yarıda bırakılmış olarak kaydedilir; sıralamaya sayılmaz. Girilen roundlar silinmez.'}
+                  : 'Henüz round girilmedi. Oyun iptal edilir; sıralamaya sayılmaz.'}
               </p>
               <div className="bg-[var(--warn-bg)] border border-[var(--warn-border)] rounded-xl px-4 py-2.5 mb-5">
                 <span className="text-ayellow text-xs">Bu işlem geri alınamaz!</span>
@@ -978,9 +979,9 @@ function GamePageContent() {
               <div className="grid grid-cols-2 gap-3">
                 <button onClick={() => { setConfirmAction(null); setActionError(''); }} disabled={actionBusy}
                   className="bg-s2 border border-sep text-l2 py-3 rounded-xl font-medium text-sm transition-colors active:scale-[0.97] touch-manipulation">İptal</button>
-                <button onClick={confirmAction === 'finish' ? executeFinishGame : executeAbandon} disabled={actionBusy}
+                <button onClick={confirmAction === 'finish' ? executeFinishGame : executeCancel} disabled={actionBusy}
                   className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] touch-manipulation bg-[var(--danger-bg)] border border-[var(--danger-border)] text-ared hover:opacity-90 disabled:opacity-50">
-                  {actionBusy ? '...' : confirmAction === 'finish' ? 'Evet, Bitir' : 'Evet, Bırak'}
+                  {actionBusy ? '...' : confirmAction === 'finish' ? 'Evet, Bitir' : 'Evet, İptal Et'}
                 </button>
               </div>
             </div>

@@ -25,7 +25,7 @@ CREATE OR REPLACE FUNCTION pg_temp.giris(p_user UUID) RETURNS VOID LANGUAGE sql 
   SELECT set_config('request.jwt.claims', json_build_object('sub', p_user, 'role', 'authenticated')::text, true);
 $$;
 
--- Oyunu kurar, test oyuncularına onaylatır, elleri sırayla (her eli farklı oyuncu) girer, bitirir
+-- Oyunu kurar, test oyuncularına onaylatır, elleri girer (sadece kuran yazabilir) ve bitirir
 CREATE OR REPLACE FUNCTION pg_temp.oyna(p_mode TEXT, p_me UUID, p_rounds JSONB[], p_t0 TIMESTAMPTZ,
                              p_fix_round INT DEFAULT NULL, p_fix JSONB DEFAULT NULL)
 RETURNS UUID LANGUAGE plpgsql AS $$
@@ -55,10 +55,10 @@ BEGIN
 
   FOR i IN 1..array_length(p_rounds, 1) LOOP
     t := p_t0 + interval '1 minute' + i * interval '8 minutes' + (i % 3) * interval '70 seconds';
-    PERFORM pg_temp.giris(seats[(i - 1) % 4 + 1]);
+    PERFORM pg_temp.giris(p_me);
     PERFORM save_round(g, i, ((i - 1) % 4)::SMALLINT, p_rounds[i], t,
                        jsonb_build_object('client_started_at', t - interval '35 seconds' - (i % 4) * interval '10 seconds',
-                                          'device_id', 'demo-' || ((i - 1) % 4 + 1), 'app_version', 'demo'),
+                                          'device_id', 'demo-1', 'app_version', 'demo'),
                        0);
   END LOOP;
 
