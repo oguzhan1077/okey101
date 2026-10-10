@@ -280,7 +280,18 @@ export interface PlayerStats {
   tag: number | null;
   badge: string | null;
   modes: Partial<Record<GameMode, ModeStats>>;
+  baseline: Partial<Record<GameMode, ModeBaseline>>;  // o moddaki tüm bitmiş oyunların genel ortalaması
   recent: RecentGame[];
+}
+
+export interface ModeBaseline {
+  avg_round_score: number;
+  okey_per_round: number;
+  finish_pct: number;
+  not_opened_pct: number | null;
+  penalty_per_round: number;
+  avg_game_score: number;
+  win_pct: number;
 }
 
 export async function fetchPlayerStats(userId: string): Promise<PlayerStats | null> {

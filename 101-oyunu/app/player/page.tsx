@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { GameMode, ModeStats, PlayerStats, fetchPlayerStats } from '@/lib/gameApi';
+import { GameMode, ModeBaseline, ModeStats, PlayerStats, fetchPlayerStats } from '@/lib/gameApi';
 import { nameWithTag } from '@/lib/players';
 import { Badge, BADGE_LABELS } from '@/components/Badge';
 
@@ -15,14 +15,27 @@ const fmt = (v: number | null | undefined, digits = 1) =>
 const signed = (v: number | null | undefined, digits = 1) =>
   v === null || v === undefined ? '—' : `${Number(v) > 0 ? '+' : ''}${fmt(v, digits)}`;
 
-function StatRow({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: 'good' | 'bad' }) {
+type Tone = 'good' | 'bad' | undefined;
+
+/** Genel ortalamaya göre renk: fark %3'ten küçükse renklendirme (küçük farklar yanıltmasın) */
+function compareTone(value: number | null | undefined, avg: number | null | undefined, better: 'lower' | 'higher'): Tone {
+  if (value === null || value === undefined || avg === null || avg === undefined) return undefined;
+  const v = Number(value), a = Number(avg);
+  if (Math.abs(v - a) <= Math.max(Math.abs(a) * 0.03, 0.005)) return undefined;
+  return (better === 'lower' ? v < a : v > a) ? 'good' : 'bad';
+}
+
+function StatRow({ label, value, hint, tone, avg }: { label: string; value: string; hint?: string; tone?: Tone; avg?: string }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-sep first:border-t-0">
+    <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-sep first:border-t-0">
       <div className="min-w-0">
         <div className="text-l2 text-sm">{label}</div>
         {hint && <div className="text-l4 text-[11px]">{hint}</div>}
       </div>
-      <div className={`text-sm font-bold tabular-nums ${tone === 'good' ? 'text-agreen' : tone === 'bad' ? 'text-ared' : 'text-l1'}`}>{value}</div>
+      <div className="text-right flex-shrink-0">
+        <div className={`text-sm font-bold tabular-nums ${tone === 'good' ? 'text-agreen' : tone === 'bad' ? 'text-ared' : 'text-l1'}`}>{value}</div>
+        {avg && <div className="text-l4 text-[10px] tabular-nums">genel ort. {avg}</div>}
+      </div>
     </div>
   );
 }
@@ -45,6 +58,8 @@ function PlayerContent() {
   }, [userId]);
 
   const m: ModeStats | undefined = stats?.modes[mode];
+  const b: ModeBaseline | undefined = stats?.baseline?.[mode];
+  const pct = (v: number | null | undefined) => (v === null || v === undefined ? undefined : `%${fmt(v)}`);
   const recent = (stats?.recent ?? []).filter((g) => g.mode === mode);
 
   return (
@@ -119,20 +134,35 @@ function PlayerContent() {
                   </div>
                   <div className="bg-s1 border border-sep rounded-2xl px-3 py-3 text-center">
                     <div className="text-[10px] text-l3 uppercase tracking-widest">Kazanma</div>
-                    <div className="text-xl font-black text-l1 mt-0.5 tabular-nums">%{fmt((100 * m.wins) / m.games, 0)}</div>
+                    {(() => {
+                      const winPct = (100 * m.wins) / m.games;
+                      const tone = compareTone(winPct, b?.win_pct, 'higher');
+                      return (
+                        <div className={`text-xl font-black mt-0.5 tabular-nums ${tone === 'good' ? 'text-agreen' : tone === 'bad' ? 'text-ared' : 'text-l1'}`}>
+                          %{fmt(winPct, 0)}
+                        </div>
+                      );
+                    })()}
                     <div className="text-[10px] text-l4">{mode === 'single' ? `ort. ${fmt(m.avg_place, 1)}. sıra` : 'takımla'}</div>
+                    {b && <div className="text-[10px] text-l4 tabular-nums">genel %{fmt(b.win_pct, 0)}</div>}
                   </div>
                 </div>
 
                 {/* Round istatistikleri */}
                 <p className="text-l3 text-xs font-semibold uppercase tracking-wider mb-2">Round başına · {m.rounds} round</p>
                 <div className="bg-s1 border border-sep rounded-2xl overflow-hidden mb-4">
-                  <StatRow label="Ortalama puan" value={fmt(m.avg_round_score)} hint="Düşük daha iyi" />
-                  <StatRow label="Okey" value={fmt(m.okey_per_round, 2)} hint="Round başına gelen okey sayısı" />
-                  <StatRow label="Bitirme oranı" value={`%${fmt(m.finish_pct)}`} />
+                  <StatRow label="Ortalama puan" value={fmt(m.avg_round_score)} hint="Düşük daha iyi"
+                    avg={b && fmt(b.avg_round_score)} tone={compareTone(m.avg_round_score, b?.avg_round_score, 'lower')} />
+                  {/* Okey şanstır: kıyas gösterilir ama renklendirilmez */}
+                  <StatRow label="Okey" value={fmt(m.okey_per_round, 2)} hint="Round başına gelen okey sayısı"
+                    avg={b && fmt(b.okey_per_round, 2)} />
+                  <StatRow label="Bitirme oranı" value={`%${fmt(m.finish_pct)}`}
+                    avg={pct(b?.finish_pct)} tone={compareTone(m.finish_pct, b?.finish_pct, 'higher')} />
                   <StatRow label="Elden bitirme" value={String(m.hand_finishes)} hint="Toplam" />
-                  <StatRow label="Açamama oranı" value={m.not_opened_pct === null ? '—' : `%${fmt(m.not_opened_pct)}`} hint="Elden biten roundlar hariç" />
-                  <StatRow label="Ceza" value={fmt(m.penalty_per_round, 2)} hint="Round başına bireysel ceza sayısı" />
+                  <StatRow label="Açamama oranı" value={m.not_opened_pct === null ? '—' : `%${fmt(m.not_opened_pct)}`} hint="Elden biten roundlar hariç"
+                    avg={pct(b?.not_opened_pct)} tone={compareTone(m.not_opened_pct, b?.not_opened_pct, 'lower')} />
+                  <StatRow label="Ceza" value={fmt(m.penalty_per_round, 2)} hint="Round başına bireysel ceza sayısı"
+                    avg={b && fmt(b.penalty_per_round, 2)} tone={compareTone(m.penalty_per_round, b?.penalty_per_round, 'lower')} />
                   <StatRow
                     label="Beceri"
                     value={signed(m.skill_per_round)}
@@ -144,7 +174,8 @@ function PlayerContent() {
                 {/* Oyun istatistikleri */}
                 <p className="text-l3 text-xs font-semibold uppercase tracking-wider mb-2">Oyun başına</p>
                 <div className="bg-s1 border border-sep rounded-2xl overflow-hidden mb-4">
-                  <StatRow label="Ortalama oyun skoru" value={fmt(m.avg_game_score)} />
+                  <StatRow label="Ortalama oyun skoru" value={fmt(m.avg_game_score)} hint="Düşük daha iyi"
+                    avg={b && fmt(b.avg_game_score)} tone={compareTone(m.avg_game_score, b?.avg_game_score, 'lower')} />
                   <StatRow
                     label="Beceri"
                     value={signed(m.skill_per_game)}
