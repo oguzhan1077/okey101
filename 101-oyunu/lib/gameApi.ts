@@ -6,7 +6,7 @@ import { gameMeta, roundMeta, newId } from '@/lib/clientMeta';
 
 export type GameMode = 'single' | 'group';
 export type GameStatus = 'pending' | 'active' | 'finished' | 'abandoned' | 'cancelled';
-export type InviteStatus = 'accepted' | 'pending' | 'declined' | 'guest';
+export type InviteStatus = 'accepted' | 'pending' | 'declined' | 'guest' | 'expired';
 
 export interface GameInfo {
   id: string;
@@ -20,6 +20,8 @@ export interface GameInfo {
   round_count: number;
   started_at: string | null;
   winner_label: string | null;
+  created_at: string;
+  end_reason: 'completed' | 'abandoned' | 'declined' | 'cancelled' | 'expired' | null;
 }
 
 export interface SeatInfo {
@@ -68,6 +70,7 @@ export interface LoadedGame {
   seats: SeatInfo[];
   rounds: RoundRecord[];
   results: GameResultRow[];
+  inviteExpiresAt: string | null;  // onay bekleyen oyunda davetlerin süresinin dolacağı an
 }
 
 export const emptySeatScore = (): SeatScore => ({
@@ -97,11 +100,11 @@ function isTransient(error: { code?: string; message?: string }): boolean {
 
 // ── Okuma ─────────────────────────────────────────────────────────────────────
 
-export async function loadGame(gameId: string): Promise<LoadedGame | null> {
+export async function loadGame(gameId: string, expiryChecked = false): Promise<LoadedGame | null> {
   const client = db();
   const [g, p, r, s, res] = await Promise.all([
     client.from('games')
-      .select('id, mode, is_ranked, status, created_by, team1_name, team2_name, first_dealer_seat, round_count, started_at, winner_label')
+      .select('id, mode, is_ranked, status, created_by, team1_name, team2_name, first_dealer_seat, round_count, started_at, winner_label, created_at, end_reason')
       .eq('id', gameId).maybeSingle(),
     client.from('game_players').select('seat, team, user_id, name, invite_status').eq('game_id', gameId).order('seat'),
     client.from('rounds').select('round_no, dealer_seat, revision').eq('game_id', gameId).order('round_no'),
@@ -114,6 +117,20 @@ export async function loadGame(gameId: string): Promise<LoadedGame | null> {
   ]);
   for (const q of [g, p, r, s, res]) if (q.error) throw q.error;
   if (!g.data) return null;
+
+  // Onay bekleyen oyun: süre dolduysa sunucuya davetleri kapattır ve yeniden oku
+  let inviteExpiresAt: string | null = null;
+  if (g.data.status === 'pending') {
+    const { data: cfg } = await client.from('rating_config').select('invite_timeout_minutes').maybeSingle();
+    if (cfg) {
+      const expires = new Date(g.data.created_at).getTime() + cfg.invite_timeout_minutes * 60000;
+      inviteExpiresAt = new Date(expires).toISOString();
+      if (Date.now() >= expires && !expiryChecked) {
+        const { data: closed } = await client.rpc('expire_pending_invites');
+        if (Number(closed) > 0) return loadGame(gameId, true);
+      }
+    }
+  }
 
   const seats = (p.data ?? []) as SeatInfo[];
   const scoresByRound = new Map<number, SeatScore[]>();
@@ -156,7 +173,7 @@ export async function loadGame(gameId: string): Promise<LoadedGame | null> {
     };
   });
 
-  return { game: g.data as GameInfo, seats, rounds, results };
+  return { game: g.data as GameInfo, seats, rounds, results, inviteExpiresAt };
 }
 
 export interface InviteRow {
@@ -166,6 +183,7 @@ export interface InviteRow {
   creator_name: string | null;
   players: string[];
   created_at: string;
+  expires_at: string;
 }
 
 export async function fetchMyInvites(): Promise<InviteRow[]> {

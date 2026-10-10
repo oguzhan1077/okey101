@@ -1,6 +1,7 @@
 -- TEST: Test oyuncularına gelen bekleyen tüm davetleri onlar adına ONAYLAR.
--- Uygulamadan test oyuncularıyla dereceli oyun kurduktan sonra çalıştır;
--- uygulamadaki bekleme ekranı birkaç saniye içinde oyunu başlatır.
+-- Uygulamadan test oyuncularıyla dereceli oyun kurduktan sonra 5 DAKİKA İÇİNDE çalıştır
+-- (davetlerin süresi 5 dakikada dolar, oyun iptal olur).
+-- Uygulamadaki bekleme ekranı birkaç saniye içinde oyunu başlatır.
 
 DO $$
 DECLARE

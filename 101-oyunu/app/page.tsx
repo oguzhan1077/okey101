@@ -454,7 +454,13 @@ function HomeContent() {
                 <p className="text-l1 text-sm font-semibold">
                   {inv.creator_name ?? 'Biri'} seni oyuna ekledi
                 </p>
-                <p className="text-l3 text-xs mt-0.5">{modeLabel(inv.mode, inv.is_ranked)}</p>
+                <p className="text-l3 text-xs mt-0.5">
+                  {modeLabel(inv.mode, inv.is_ranked)}
+                  {' · '}
+                  <span className="text-ayellow font-semibold">
+                    {Math.max(1, Math.ceil((new Date(inv.expires_at).getTime() - Date.now()) / 60000))} dk içinde onayla
+                  </span>
+                </p>
                 <p className="text-l2 text-xs mt-2">{inv.players.join(' · ')}</p>
                 <div className="grid grid-cols-2 gap-2 mt-3">
                   <button

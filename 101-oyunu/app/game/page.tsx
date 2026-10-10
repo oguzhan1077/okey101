@@ -58,6 +58,8 @@ function GamePageContent() {
   const [seats, setSeats] = useState<SeatInfo[]>([]);
   const [rounds, setRounds] = useState<RoundRecord[]>([]);
   const [results, setResults] = useState<GameResultRow[]>([]);
+  const [inviteExpiresAt, setInviteExpiresAt] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notfound' | 'error'>('loading');
   const [sync, setSync] = useState<SyncState>({ pending: 0, error: null, offline: false });
 
@@ -91,6 +93,7 @@ function GamePageContent() {
       setSeats(data.seats);
       setRounds(mergePending(gameId, data.rounds));
       setResults(data.results);
+      setInviteExpiresAt(data.inviteExpiresAt);
       setLoadState('ready');
       if (!['pending', 'active'].includes(data.game.status)) {
         try { if (localStorage.getItem(ACTIVE_GAME_KEY) === gameId) localStorage.removeItem(ACTIVE_GAME_KEY); } catch { /* yok */ }
@@ -128,6 +131,13 @@ function GamePageContent() {
     window.addEventListener('online', onOnline);
     return () => { clearInterval(timer); window.removeEventListener('online', onOnline); };
   }, [gameId, status, flush, reload]);
+
+  // Onay beklerken geri sayım
+  useEffect(() => {
+    if (status !== 'pending') return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [status]);
 
   // ── Türetilmiş değerler ──────────────────────────────────────────────────────
 
@@ -472,14 +482,27 @@ function GamePageContent() {
   if (game.status === 'pending' || game.status === 'cancelled') {
     const isCancelled = game.status === 'cancelled';
     const canCancel = !isCancelled && !!user && game.created_by === user.id;
+    const msLeft = inviteExpiresAt ? new Date(inviteExpiresAt).getTime() - now : null;
+    const countdown = msLeft === null ? null
+      : msLeft <= 0 ? '0:00'
+      : `${Math.floor(msLeft / 60000)}:${String(Math.floor((msLeft % 60000) / 1000)).padStart(2, '0')}`;
+    const inviteLabel: Record<string, [string, string]> = {
+      accepted: ['Onayladı', 'text-agreen'],
+      declined: ['Reddetti', 'text-ared'],
+      expired: ['Süresi doldu', 'text-l4'],
+      pending: ['Bekliyor', 'text-ayellow'],
+      guest: ['Misafir', 'text-l4'],
+    };
     return centered(<>
       <div className="flex justify-end mb-4"><ThemeToggle /></div>
-      <p className="text-[10px] text-l3 uppercase tracking-widest mb-1">{isGroupMode ? 'Grup' : 'Tekli'} · dereceli</p>
+      <p className="text-[10px] text-l3 uppercase tracking-widest mb-1">{isGroupMode ? 'Grup' : 'Tekli'} · {game.is_ranked ? 'dereceli' : 'derecesiz'}</p>
       <h1 className="text-xl font-bold text-l1 mb-1">{isCancelled ? 'Oyun iptal edildi' : 'Onay bekleniyor'}</h1>
       <p className="text-l3 text-sm mb-6">
         {isCancelled
-          ? (seats.some((s) => s.invite_status === 'declined') ? 'Bir oyuncu daveti reddetti.' : 'Oyun başlamadan iptal edildi.')
-          : 'Herkes kendi telefonundan onaylayınca oyun başlar.'}
+          ? game.end_reason === 'expired' ? 'Davetler süresi içinde onaylanmadı.'
+            : game.end_reason === 'declined' ? 'Bir oyuncu daveti reddetti.'
+            : 'Oyun başlamadan iptal edildi.'
+          : <>Herkes kendi telefonundan onaylayınca oyun başlar.{countdown && <> Kalan süre: <span className="font-bold text-l1 tabular-nums">{countdown}</span></>}</>}
       </p>
       <div className={`${glassCard} divide-y divide-sep text-left`}>
         {seats.map((s) => (
@@ -491,10 +514,8 @@ function GamePageContent() {
                   .filter(Boolean).join(' · ')}
               </div>
             </div>
-            <span className={`text-xs font-semibold ${
-              s.invite_status === 'accepted' ? 'text-agreen' : s.invite_status === 'declined' ? 'text-ared' : 'text-ayellow'
-            }`}>
-              {s.invite_status === 'accepted' ? 'Onayladı' : s.invite_status === 'declined' ? 'Reddetti' : 'Bekliyor'}
+            <span className={`text-xs font-semibold ${inviteLabel[s.invite_status]?.[1] ?? 'text-l4'}`}>
+              {inviteLabel[s.invite_status]?.[0] ?? s.invite_status}
             </span>
           </div>
         ))}

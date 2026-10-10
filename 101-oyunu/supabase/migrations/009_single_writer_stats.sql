@@ -11,6 +11,7 @@
 --    (simülasyonda ~350–2600 aralığı). Sonuç eğrisi 2.5 → 1.75 (farklar ~%25 daha açık).
 --    Formül sürümü v2. finish_game bu yüzden yeniden tanımlanır.
 -- 4. get_player_stats: sıralamada oyuncuya tıklayınca gösterilen istatistikler.
+-- 5. Davetler 5 dakikada yanıtlanmazsa süresi dolar (expired); dereceli oyun iptal olur.
 
 -- ── 1–2. Yazma yetkisi ve iptal ─────────────────────────────────────────────
 
@@ -380,3 +381,145 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.get_player_stats(UUID) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_player_stats(UUID) TO anon, authenticated;
+
+-- ── 5. Davet süresi ─────────────────────────────────────────────────────────
+-- Davet invite_timeout_minutes içinde yanıtlanmazsa 'expired' olur ("reddetti"den ayrı tutulur).
+-- Dereceli oyunda süresi dolan tek davet bile oyunu iptal eder (end_reason = 'expired').
+-- Derecesiz oyun beklemediği için devam eder; sadece o davet kapanır.
+-- Zamanlanmış görev yok: süresi dolanlar, davet/oyun okunurken veya yanıtlanırken kapatılır.
+
+ALTER TABLE rating_config ADD COLUMN invite_timeout_minutes INTEGER NOT NULL DEFAULT 5;
+
+ALTER TABLE game_players DROP CONSTRAINT game_players_invite_status_check;
+ALTER TABLE game_players ADD CONSTRAINT game_players_invite_status_check
+  CHECK (invite_status IN ('accepted', 'pending', 'declined', 'guest', 'expired'));
+ALTER TABLE games DROP CONSTRAINT games_end_reason_check;
+ALTER TABLE games ADD CONSTRAINT games_end_reason_check
+  CHECK (end_reason IN ('completed', 'abandoned', 'declined', 'cancelled', 'expired'));
+
+COMMENT ON COLUMN game_players.invite_status IS
+  'accepted: onayladı; pending: bekliyor; declined: reddetti; expired: süresinde yanıtlamadı; guest: hesapsız oyuncu';
+
+-- Süresi dolan davetleri kapatır; kapanan davet sayısını döner. Kuralı uygular, başka bir şey yapmaz.
+CREATE OR REPLACE FUNCTION public.expire_pending_invites()
+RETURNS INTEGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_timeout INTERVAL;
+  v_count INTEGER;
+BEGIN
+  SELECT make_interval(mins => invite_timeout_minutes) INTO v_timeout FROM rating_config WHERE id = 1;
+
+  WITH stale AS (
+    UPDATE game_players gp
+    SET invite_status = 'expired'
+    FROM games g
+    WHERE g.id = gp.game_id
+      AND gp.invite_status = 'pending'
+      AND g.status IN ('pending', 'active')
+      AND g.created_at < now() - v_timeout
+    RETURNING gp.game_id
+  ), cancelled AS (
+    -- Süre dolduğu an bitiş zamanı olarak yazılır (kontrolün yapıldığı an değil)
+    UPDATE games g
+    SET status = 'cancelled', end_reason = 'expired', ended_at = g.created_at + v_timeout
+    WHERE g.status = 'pending' AND g.id IN (SELECT game_id FROM stale)
+    RETURNING g.id
+  )
+  SELECT count(*) INTO v_count FROM stale;
+  RETURN v_count;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.respond_invite(p_game_id UUID, p_accept BOOLEAN)
+RETURNS TEXT  -- oyunun yeni durumu
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_uid UUID := auth.uid();
+  g games%ROWTYPE;
+  v_mine TEXT;
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Giriş yapmalısın'; END IF;
+  PERFORM expire_pending_invites();
+
+  SELECT * INTO g FROM games WHERE id = p_game_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Oyun bulunamadı'; END IF;
+
+  SELECT invite_status INTO v_mine FROM game_players WHERE game_id = p_game_id AND user_id = v_uid;
+  IF v_mine = 'expired' THEN RAISE EXCEPTION 'Davetin süresi doldu'; END IF;
+  IF g.is_ranked AND g.status <> 'pending' THEN
+    RAISE EXCEPTION 'Bu oyun artık onay beklemiyor (durum: %)', g.status;
+  END IF;
+
+  UPDATE game_players
+  SET invite_status = CASE WHEN p_accept THEN 'accepted' ELSE 'declined' END, responded_at = now()
+  WHERE game_id = p_game_id AND user_id = v_uid AND invite_status = 'pending';
+  IF NOT FOUND THEN RAISE EXCEPTION 'Bu oyunda bekleyen davetin yok'; END IF;
+
+  IF g.is_ranked THEN
+    IF NOT p_accept THEN
+      UPDATE games SET status = 'cancelled', ended_at = now(), ended_by = v_uid, end_reason = 'declined'
+      WHERE id = p_game_id;
+      RETURN 'cancelled';
+    ELSIF NOT EXISTS (SELECT 1 FROM game_players WHERE game_id = p_game_id AND invite_status <> 'accepted') THEN
+      UPDATE games SET status = 'active', started_at = now() WHERE id = p_game_id;
+      RETURN 'active';
+    END IF;
+  END IF;
+  RETURN g.status;
+END;
+$$;
+
+-- Dönüş tipi değiştiği için (expires_at eklendi) yeniden oluşturulur
+DROP FUNCTION public.my_invites();
+CREATE FUNCTION public.my_invites()
+RETURNS TABLE (game_id UUID, mode TEXT, is_ranked BOOLEAN, creator_name TEXT, players TEXT[],
+               created_at TIMESTAMPTZ, expires_at TIMESTAMPTZ)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  PERFORM expire_pending_invites();
+  RETURN QUERY
+  SELECT g.id, g.mode, g.is_ranked, cp.display_name,
+         (SELECT array_agg(x.name ORDER BY x.seat) FROM game_players x WHERE x.game_id = g.id),
+         g.created_at,
+         g.created_at + make_interval(mins => (SELECT invite_timeout_minutes FROM rating_config WHERE id = 1))
+  FROM game_players me
+  JOIN games g ON g.id = me.game_id
+  LEFT JOIN profiles cp ON cp.id = g.created_by
+  WHERE me.user_id = auth.uid()
+    AND me.invite_status = 'pending'
+    AND g.status IN ('pending', 'active')
+  ORDER BY g.created_at DESC;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.my_active_games()
+RETURNS TABLE (game_id UUID, mode TEXT, is_ranked BOOLEAN, status TEXT, players TEXT[], round_count INTEGER, created_at TIMESTAMPTZ)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  PERFORM expire_pending_invites();
+  RETURN QUERY
+  SELECT g.id, g.mode, g.is_ranked, g.status,
+         (SELECT array_agg(x.name ORDER BY x.seat) FROM game_players x WHERE x.game_id = g.id),
+         g.round_count, g.created_at
+  FROM games g
+  WHERE g.status IN ('pending', 'active')
+    AND g.created_at > now() - interval '2 days'
+    AND (g.created_by = auth.uid()
+         OR EXISTS (SELECT 1 FROM game_players me
+                    WHERE me.game_id = g.id AND me.user_id = auth.uid() AND me.invite_status = 'accepted'))
+  ORDER BY g.created_at DESC;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.expire_pending_invites(), public.my_invites() FROM PUBLIC, anon, authenticated;
+-- Onay bekleme ekranı, oyunu okurken süresi dolanları kapatabilsin diye herkese açık (sadece kuralı uygular)
+GRANT EXECUTE ON FUNCTION public.expire_pending_invites() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.my_invites() TO authenticated;
+
+-- Şu an süresi geçmiş halde bekleyen davetleri hemen kapat
+SELECT expire_pending_invites();
