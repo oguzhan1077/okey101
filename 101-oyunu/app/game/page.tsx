@@ -895,7 +895,7 @@ function GamePageContent() {
         {canWrite && (
           <div className={`${glassCard} p-4`}>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-l3 text-sm">Sonraki round · dağıtan <span className="text-l2 font-medium">{names[nextDealer]}</span></span>
+              <span className="text-l3 text-sm">Sonraki round</span>
               <span className="text-l1 font-semibold text-sm">Round {nextRoundNo}</span>
             </div>
             <button
