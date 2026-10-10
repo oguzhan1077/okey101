@@ -1,122 +1,278 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { PersonIcon, PeopleIcon, LogoutIcon } from '@/components/Icons';
+import { PersonIcon, PeopleIcon, LogoutIcon, TrophyIcon } from '@/components/Icons';
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
-
-const NAME_REGEX = /^[a-zA-ZğĞıİşŞüÜöÖçÇ0-9., ]*$/;
+import {
+  NAME_REGEX, DISPLAY_NAME_MAX, RegisteredPlayer, normalizeName, findPlayerByName,
+  validateDisplayName, fetchRegisteredPlayers, fetchOwnDisplayName, saveOwnDisplayName,
+} from '@/lib/players';
+import {
+  GameMode, InviteRow, ActiveGameRow, NewGamePlayer,
+  createGame, respondInvite, fetchMyInvites, fetchMyActiveGames, errorText,
+} from '@/lib/gameApi';
 
 const inputBase = 'w-full px-4 py-3.5 bg-s2 border rounded-xl text-l1 text-base transition-colors';
+const ACTIVE_GAME_KEY = 'activeGameId';
+
+const modeLabel = (mode: GameMode, ranked: boolean) => `${mode === 'single' ? 'Tekli' : 'Grup'} · ${ranked ? 'dereceli' : 'derecesiz'}`;
+
+// Oyuncular masadaki sırayla girilir: oyun yönünde (herkes sağındakine taş atar)
+const seatHint = (isOwnFirst: boolean) => isOwnFirst
+  ? ['Sen', 'Sağındaki', 'Karşındaki', 'Solundaki']
+  : ['1. oyuncu', 'Sağındaki', 'Karşısındaki', 'Solundaki'];
 
 function HomeContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { user, loading, signOut } = useAuth();
-  const [gameMode, setGameMode] = useState<'group' | 'single' | null>(null);
+  const [gameMode, setGameMode] = useState<GameMode | null>(null);
+  const [isRanked, setIsRanked] = useState(false);
   const [group1Name, setGroup1Name] = useState('');
   const [group2Name, setGroup2Name] = useState('');
-  const [player1, setPlayer1] = useState('');
-  const [player2, setPlayer2] = useState('');
-  const [player3, setPlayer3] = useState('');
-  const [player4, setPlayer4] = useState('');
-  const [hasOngoingGame, setHasOngoingGame] = useState(false);
-  const [ongoingGameData, setOngoingGameData] = useState<any>(null);
-  const [dealerIndex, setDealerIndex] = useState<number>(0)
+  const [playerNames, setPlayerNames] = useState(['', '', '', '']);
+  const [dealerIndex, setDealerIndex] = useState(0);
+  const [setupStartedAt, setSetupStartedAt] = useState<string | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [startError, setStartError] = useState('');
+
+  // Kayıtlı oyuncular ve kullanıcının kendi görünen adı
+  const [registeredPlayers, setRegisteredPlayers] = useState<RegisteredPlayer[]>([]);
+  const [ownName, setOwnName] = useState<string | null>(null);
+  const [ownNameLoaded, setOwnNameLoaded] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [nameError, setNameError] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+
+  // Davetler ve devam eden oyunlar
+  const [invites, setInvites] = useState<InviteRow[]>([]);
+  const [activeGames, setActiveGames] = useState<ActiveGameRow[]>([]);
+  const [guestGameId, setGuestGameId] = useState<string | null>(null);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
 
   useEffect(() => { router.prefetch('/game'); }, [router]);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('roundDetails');
-      const roundDetails = stored ? JSON.parse(stored) : [];
-      if (roundDetails.length > 0) {
-        setHasOngoingGame(true);
-        setOngoingGameData(roundDetails[roundDetails.length - 1]);
-      }
-    } catch {
-      setHasOngoingGame(false);
-    }
+    try { setGuestGameId(localStorage.getItem(ACTIVE_GAME_KEY)); } catch { /* depolama kapalı */ }
+    // Eski sürümün yerel oyun verisi artık kullanılmıyor
+    try { localStorage.removeItem('roundDetails'); localStorage.removeItem('currentGameId'); } catch { /* yok */ }
   }, []);
 
-  const handleReturnToGame = () => {
-    if (!ongoingGameData) return;
-    const mode = ongoingGameData.mode || 'single';
-    const p1 = ongoingGameData.player1 || ongoingGameData.players?.[0]?.name || '';
-    const p2 = ongoingGameData.player2 || ongoingGameData.players?.[1]?.name || '';
-    const p3 = ongoingGameData.player3 || ongoingGameData.players?.[2]?.name || '';
-    const p4 = ongoingGameData.player4 || ongoingGameData.players?.[3]?.name || '';
-    const params = new URLSearchParams({ mode, player1: p1, player2: p2, player3: p3, player4: p4 });
-    if (mode === 'group' && ongoingGameData.group1 && ongoingGameData.group2) {
-      params.append('group1', ongoingGameData.group1);
-      params.append('group2', ongoingGameData.group2);
+  useEffect(() => {
+    if (!user) {
+      setRegisteredPlayers([]);
+      setOwnName(null);
+      setOwnNameLoaded(false);
+      setInvites([]);
+      setActiveGames([]);
+      return;
     }
-    router.push(`/game?${params.toString()}`);
+    fetchOwnDisplayName(user.id)
+      .then(setOwnName)
+      .catch((error) => console.error('Görünen ad alınamadı:', error))
+      .finally(() => setOwnNameLoaded(true));
+    fetchRegisteredPlayers()
+      .then(setRegisteredPlayers)
+      .catch((error) => console.error('Oyuncu listesi alınamadı:', error));
+  }, [user]);
+
+  const refreshGames = useCallback(() => {
+    if (!user) return;
+    fetchMyInvites().then(setInvites).catch(() => {});
+    fetchMyActiveGames().then(setActiveGames).catch(() => {});
+  }, [user]);
+
+  // Davetler masadakilerin telefonuna buradan düşer: sayfa açıkken düzenli kontrol
+  useEffect(() => {
+    if (!user) return;
+    refreshGames();
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') refreshGames(); }, 8000);
+    return () => clearInterval(timer);
+  }, [user, refreshGames]);
+
+  // Oyunu kuran kişi genelde masadadır: ilk oyuncuyu kendi adıyla doldur
+  useEffect(() => {
+    if (ownName && gameMode && !playerNames[0]) setPlayerName(0, ownName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownName, gameMode]);
+
+  const setPlayerName = (index: number, value: string) => {
+    setPlayerNames((prev) => prev.map((n, i) => (i === index ? value : n)));
   };
 
-  const canStartGame = () => {
-    if (gameMode === 'group') {
-      return group1Name.trim() && group2Name.trim() && player1.trim() && player2.trim() && player3.trim() && player4.trim();
-    } else if (gameMode === 'single') {
-      return player1.trim() && player2.trim() && player3.trim() && player4.trim();
-    }
-    return false;
+  const chooseMode = (mode: GameMode) => {
+    setGameMode(mode);
+    setStartError('');
+    if (!setupStartedAt) setSetupStartedAt(new Date().toISOString());
   };
 
-  const handleStartGame = () => {
-    if (!canStartGame() || isStarting) return;
-    setIsStarting(true);
-
-    const params = new URLSearchParams({
-      mode: gameMode!,
-      player1, player2, player3, player4,
-      dealer: dealerIndex.toString(),
-    });
-    if (gameMode === 'group') {
-      params.append('group1', group1Name);
-      params.append('group2', group2Name);
-    }
-
-    // Hemen navigate et, API kaydını arka planda yap
-    router.push(`/game?${params.toString()}`);
-
-    fetch('/api/games', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        game_mode: gameMode,
-        team1_name: gameMode === 'group' ? group1Name : null,
-        team2_name: gameMode === 'group' ? group2Name : null,
-        players: [player1, player2, player3, player4],
-      }),
-    }).then(async (response) => {
-      if (response.ok) {
-        const game = await response.json();
-        localStorage.setItem('currentGameId', game.id);
+  const handleSaveName = async () => {
+    if (!user || isSavingName) return;
+    const validationError = validateDisplayName(nameInput);
+    if (validationError) { setNameError(validationError); return; }
+    setIsSavingName(true);
+    setNameError('');
+    try {
+      const result = await saveOwnDisplayName(nameInput);
+      if (result === 'taken') setNameError('Bu görünen ad başka bir oyuncu tarafından kullanılıyor');
+      else if (result === 'invalid') setNameError('Görünen ad geçersiz');
+      else {
+        setOwnName(nameInput.trim());
+        fetchRegisteredPlayers().then(setRegisteredPlayers).catch(() => {});
       }
-    }).catch((error) => {
-      console.error('Oyun kaydı hatası:', error);
-    });
+    } catch (error) {
+      console.error('Görünen ad kaydedilemedi:', error);
+      setNameError('Kaydedilemedi, tekrar deneyin');
+    } finally {
+      setIsSavingName(false);
+    }
   };
 
-  const playerList = [
-    { value: player1, setter: setPlayer1 },
-    { value: player2, setter: setPlayer2 },
-    { value: player3, setter: setPlayer3 },
-    { value: player4, setter: setPlayer4 },
-  ];
+  const handleInvite = async (gameId: string, accept: boolean) => {
+    setRespondingId(gameId);
+    try {
+      const status = await respondInvite(gameId, accept);
+      if (accept && (status === 'active' || status === 'pending')) {
+        router.push(`/game?id=${gameId}`);
+        return;
+      }
+      refreshGames();
+    } catch (error) {
+      alert(errorText(error));
+      refreshGames();
+    } finally {
+      setRespondingId(null);
+    }
+  };
 
-  const groupPlayerList = [
-    { value: player1, setter: setPlayer1, team: 'blue' as const, teamLabel: group1Name || '1. Takım', pos: 1 },
-    { value: player2, setter: setPlayer2, team: 'purple' as const, teamLabel: group2Name || '2. Takım', pos: 2 },
-    { value: player3, setter: setPlayer3, team: 'blue' as const, teamLabel: group1Name || '1. Takım', pos: 3 },
-    { value: player4, setter: setPlayer4, team: 'purple' as const, teamLabel: group2Name || '2. Takım', pos: 4 },
-  ];
+  // Yazılan isimleri kayıtlı hesaplara eşle; eşleşmeyen isim misafir sayılır
+  const resolvedPlayers = playerNames.map((name) => {
+    const registered = user ? findPlayerByName(registeredPlayers, name) : undefined;
+    return { name: registered ? registered.display_name : name.trim().replace(/\s+/g, ' '), id: registered?.id ?? null };
+  });
+
+  const hasDuplicateNames = (() => {
+    const keys = resolvedPlayers.map((p) => normalizeName(p.name)).filter(Boolean);
+    return new Set(keys).size !== keys.length;
+  })();
+
+  const allNamesFilled = playerNames.every((n) => n.trim());
+  const teamsFilled = gameMode !== 'group' || (group1Name.trim() && group2Name.trim());
+  const rankedProblem = !isRanked ? null
+    : !ownName ? 'Dereceli oyun için önce görünen adını belirle'
+    : resolvedPlayers.some((p) => p.name && !p.id) ? 'Dereceli oyunda 4 oyuncunun da hesabı olmalı'
+    : allNamesFilled && !resolvedPlayers.some((p) => p.id === user?.id) ? 'Dereceli oyunu masadaki biri kurmalı (kendini ekle)'
+    : null;
+
+  const canStartGame = !!gameMode && allNamesFilled && !!teamsFilled && !hasDuplicateNames && !rankedProblem;
+
+  const handleStartGame = async () => {
+    if (!canStartGame || isStarting || !gameMode) return;
+    setIsStarting(true);
+    setStartError('');
+    try {
+      const players: NewGamePlayer[] = resolvedPlayers.map((p) => (p.id ? { user_id: p.id } : { guest_name: p.name }));
+      const gameId = await createGame({
+        mode: gameMode,
+        isRanked,
+        players,
+        firstDealerSeat: dealerIndex,
+        team1Name: group1Name.trim(),
+        team2Name: group2Name.trim(),
+        setupStartedAt,
+      });
+      try { localStorage.setItem(ACTIVE_GAME_KEY, gameId); } catch { /* depolama kapalı */ }
+      router.push(`/game?id=${gameId}`);
+    } catch (error) {
+      console.error('Oyun kurulamadı:', error);
+      setStartError(errorText(error));
+      setIsStarting(false);
+    }
+  };
+
+  const hints = seatHint(!!ownName && normalizeName(playerNames[0]) === normalizeName(ownName));
+
+  const playerTag = (index: number) => {
+    if (!playerNames[index].trim() || !user) return null;
+    const registered = !!resolvedPlayers[index].id;
+    return (
+      <span className={`w-14 flex-shrink-0 text-[10px] font-semibold text-right ${registered ? 'text-agreen' : isRanked ? 'text-ared' : 'text-l4'}`}>
+        {registered ? 'Kayıtlı' : 'Misafir'}
+      </span>
+    );
+  };
+
+  const playerRows = (
+    <div className="space-y-2">
+      {[0, 1, 2, 3].map((idx) => {
+        const team = gameMode === 'group' ? (idx % 2 === 0 ? 1 : 2) : null;
+        const teamLabel = team === 1 ? (group1Name || '1. Takım') : (group2Name || '2. Takım');
+        return (
+          <div key={idx} className="flex items-center gap-3">
+            <input
+              type="radio"
+              name="dealer"
+              checked={dealerIndex === idx}
+              onChange={() => setDealerIndex(idx)}
+              className="w-4 h-4 accent-[rgb(var(--ablue-rgb))] flex-shrink-0"
+              aria-label={`İlk dağıtan: ${idx + 1}. oyuncu`}
+            />
+            <div className="flex-1 min-w-0">
+              <div className={`text-[10px] font-semibold mb-1 ${team === 1 ? 'text-ablue/70' : team === 2 ? 'text-apurple/70' : 'text-l4'}`}>
+                {hints[idx]}{team ? ` · ${teamLabel}` : ''}
+              </div>
+              <input
+                type="text"
+                list={user ? 'registered-players' : undefined}
+                placeholder={`Oyuncu ${idx + 1}`}
+                value={playerNames[idx]}
+                onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setPlayerName(idx, e.target.value); }}
+                maxLength={20}
+                className={`${inputBase} ${team === 1 ? 'border-[var(--team1-border)]' : team === 2 ? 'border-[var(--team2-border)]' : 'border-sep'}`}
+              />
+            </div>
+            {playerTag(idx)}
+          </div>
+        );
+      })}
+      {user && (
+        <datalist id="registered-players">
+          {registeredPlayers.map((p) => <option key={p.id} value={p.display_name} />)}
+        </datalist>
+      )}
+    </div>
+  );
+
+  const startButton = (
+    <>
+      {startError && <p className="text-ared text-xs mb-3 text-center">{startError}</p>}
+      <button
+        onClick={handleStartGame}
+        disabled={!canStartGame || isStarting}
+        className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98] ${
+          canStartGame && !isStarting
+            ? 'bg-ablue text-white hover:opacity-90'
+            : 'bg-s2 text-l4 cursor-not-allowed border border-sep'
+        }`}
+      >
+        {isStarting ? 'Başlatılıyor...' : isRanked ? 'Davet Gönder' : 'Oyunu Başlat'}
+      </button>
+    </>
+  );
+
+  const leaderboardLink = (
+    <Link
+      href="/leaderboard"
+      className="flex items-center justify-center gap-2 w-full py-3 bg-s2 border border-sep text-l2 rounded-2xl font-semibold text-sm active:scale-[0.98] transition-all"
+    >
+      <TrophyIcon className="w-4 h-4 text-ablue" />
+      Sıralama
+    </Link>
+  );
 
   if (loading) {
     return (
@@ -146,51 +302,12 @@ function HomeContent() {
 
           <div className="mb-7">
             <h2 className="text-2xl font-bold text-l1">Oyuncular</h2>
-            <p className="text-l3 text-sm mt-1">İlk dağıtacak oyuncuyu seç</p>
+            <p className="text-l3 text-sm mt-1">Masadaki sırayla, sağa doğru gir · ilk dağıtacağı seç</p>
           </div>
 
-          <div className="space-y-2.5 mb-8">
-            {playerList.map(({ value, setter }, idx) => (
-              <div key={idx} className="flex items-center gap-3">
-                <input
-                  type="radio"
-                  name="dealer"
-                  checked={dealerIndex === idx}
-                  onChange={() => setDealerIndex(idx)}
-                  className="w-4 h-4 accent-[rgb(var(--ablue-rgb))] flex-shrink-0"
-                />
-                <input
-                  type="text"
-                  placeholder={`Oyuncu ${idx + 1}`}
-                  value={value}
-                  onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setter(e.target.value); }}
-                  maxLength={20}
-                  className={`${inputBase} border-sep`}
-                />
-              </div>
-            ))}
-          </div>
+          <div className="mb-8">{playerRows}</div>
 
-          {hasOngoingGame && (
-            <button
-              onClick={handleReturnToGame}
-              className="w-full mb-3 py-3.5 border border-[var(--warn-border)] bg-[var(--warn-bg)] text-ayellow rounded-2xl font-semibold text-sm active:scale-[0.98] transition-all"
-            >
-              Devam Eden Oyuna Dön
-            </button>
-          )}
-
-          <button
-            onClick={handleStartGame}
-            disabled={!canStartGame() || isStarting}
-            className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98] ${
-              canStartGame() && !isStarting
-                ? 'bg-ablue text-white hover:opacity-90'
-                : 'bg-s2 text-l4 cursor-not-allowed border border-sep'
-            }`}
-          >
-            {isStarting ? 'Başlatılıyor...' : 'Oyunu Başlat'}
-          </button>
+          {startButton}
         </div>
       </div>
     );
@@ -212,13 +329,13 @@ function HomeContent() {
             <p className="text-l4 text-xs mt-1 tracking-[0.25em] uppercase">Skor Takip</p>
           </div>
 
-          {hasOngoingGame && (
+          {guestGameId && (
             <div className="mb-5 p-4 bg-[var(--warn-bg)] border border-[var(--warn-border)] rounded-2xl">
               <p className="text-ayellow text-xs font-semibold uppercase tracking-wider mb-3">
                 Devam eden oyun
               </p>
               <button
-                onClick={handleReturnToGame}
+                onClick={() => router.push(`/game?id=${guestGameId}`)}
                 className="w-full bg-ayellow text-black py-3 rounded-xl font-bold text-sm active:scale-[0.98] transition-transform"
               >
                 Kaldığım Yerden Devam Et
@@ -228,7 +345,7 @@ function HomeContent() {
 
           <div className="space-y-3">
             <button
-              onClick={() => setGameMode('single')}
+              onClick={() => chooseMode('single')}
               className="w-full bg-ablue text-white py-4 rounded-2xl font-bold text-base hover:opacity-90 active:scale-[0.98] transition-all duration-150"
             >
               Misafir Olarak Oyna
@@ -252,10 +369,11 @@ function HomeContent() {
             >
               Hesap Oluştur
             </Link>
+            {leaderboardLink}
           </div>
 
           <p className="text-center text-l4 text-xs mt-8 leading-relaxed">
-            Hesap oluşturarak geçmişi ve istatistikleri takip edebilirsin
+            Hesap oluşturarak dereceli oyunlara katılabilir, sıralamaya girebilirsin
           </p>
         </div>
       </div>
@@ -269,9 +387,17 @@ function HomeContent() {
       <div className="sticky top-0 z-10 bg-s0h backdrop-blur-md border-b border-sep px-4 py-3 flex items-center justify-between">
         <Logo size="sm" />
         <div className="flex items-center gap-2">
+          <Link
+            href="/leaderboard"
+            aria-label="Sıralama"
+            className="w-9 h-9 flex items-center justify-center bg-s2 border border-sep rounded-xl text-ablue transition-colors active:scale-[0.94] touch-manipulation"
+          >
+            <TrophyIcon className="w-4 h-4" />
+          </Link>
           <ThemeToggle />
           <button
             onClick={() => setShowLogoutConfirm(true)}
+            aria-label="Çıkış yap"
             className="w-9 h-9 flex items-center justify-center bg-s2 border border-sep rounded-xl text-l3 transition-colors active:scale-[0.94] touch-manipulation"
           >
             <LogoutIcon className="w-4 h-4" />
@@ -282,8 +408,88 @@ function HomeContent() {
       <div className="px-4 pb-10 max-w-sm mx-auto">
         <div className="mt-7 mb-6">
           <h1 className="text-4xl font-black text-l1 tracking-tight">101 Oyunu</h1>
-          <p className="text-l3 text-sm mt-1">Dijital skor takibi</p>
+          <p className="text-l3 text-sm mt-1">{ownName ? `Merhaba ${ownName}` : 'Dijital skor takibi'}</p>
         </div>
+
+        {/* Görünen ad */}
+        {ownNameLoaded && !ownName && (
+          <div className="mb-6 p-4 bg-s1 border border-[var(--warn-border)] rounded-2xl">
+            <p className="text-l1 text-sm font-semibold mb-1">Görünen adını belirle</p>
+            <p className="text-l3 text-xs mb-3 leading-relaxed">
+              Arkadaşların seni oyunlara bu adla ekler; sıralamada da bu ad görünür.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Görünen ad"
+                value={nameInput}
+                onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setNameInput(e.target.value); }}
+                maxLength={DISPLAY_NAME_MAX}
+                className={`${inputBase} border-sep flex-1 min-w-0`}
+              />
+              <button
+                onClick={handleSaveName}
+                disabled={isSavingName || !nameInput.trim()}
+                className="px-4 rounded-xl bg-ablue text-white font-semibold text-sm disabled:opacity-50 active:scale-[0.97]"
+              >
+                {isSavingName ? '...' : 'Kaydet'}
+              </button>
+            </div>
+            {nameError && <p className="text-ared text-xs mt-2">{nameError}</p>}
+          </div>
+        )}
+
+        {/* Gelen davetler */}
+        {invites.length > 0 && (
+          <div className="mb-6 space-y-2">
+            <p className="text-l3 text-xs font-semibold uppercase tracking-wider">Davetler</p>
+            {invites.map((inv) => (
+              <div key={inv.game_id} className="p-4 bg-s1 border-2 border-ablue rounded-2xl">
+                <p className="text-l1 text-sm font-semibold">
+                  {inv.creator_name ?? 'Biri'} seni oyuna ekledi
+                </p>
+                <p className="text-l3 text-xs mt-0.5">{modeLabel(inv.mode, inv.is_ranked)}</p>
+                <p className="text-l2 text-xs mt-2">{inv.players.join(' · ')}</p>
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <button
+                    onClick={() => handleInvite(inv.game_id, false)}
+                    disabled={respondingId === inv.game_id}
+                    className="py-2.5 rounded-xl bg-s2 border border-sep text-l3 text-sm font-medium active:scale-[0.97] disabled:opacity-50"
+                  >
+                    Reddet
+                  </button>
+                  <button
+                    onClick={() => handleInvite(inv.game_id, true)}
+                    disabled={respondingId === inv.game_id}
+                    className="py-2.5 rounded-xl bg-ablue text-white text-sm font-bold active:scale-[0.97] disabled:opacity-50"
+                  >
+                    {respondingId === inv.game_id ? '...' : 'Onayla'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Devam eden oyunlar */}
+        {activeGames.length > 0 && (
+          <div className="mb-6 space-y-2">
+            <p className="text-l3 text-xs font-semibold uppercase tracking-wider">Devam eden oyunlar</p>
+            {activeGames.map((g) => (
+              <button
+                key={g.game_id}
+                onClick={() => router.push(`/game?id=${g.game_id}`)}
+                className="w-full text-left p-4 bg-[var(--warn-bg)] border border-[var(--warn-border)] rounded-2xl active:scale-[0.98] transition-all"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-ayellow text-xs font-semibold">{modeLabel(g.mode, g.is_ranked)}</span>
+                  <span className="text-l3 text-xs">{g.status === 'pending' ? 'Onay bekliyor' : `${g.round_count} el`}</span>
+                </div>
+                <p className="text-l1 text-sm mt-1.5">{g.players.join(' · ')}</p>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Oyun Modu */}
         <div className="mb-6">
@@ -294,7 +500,7 @@ function HomeContent() {
               return (
                 <button
                   key={mode}
-                  onClick={() => setGameMode(mode)}
+                  onClick={() => chooseMode(mode)}
                   className={`py-4 rounded-2xl font-semibold text-sm border transition-all active:scale-[0.98] ${
                     isSelected
                       ? 'bg-[var(--team1-bg)] border-[var(--team1-border)] text-ablue'
@@ -310,6 +516,30 @@ function HomeContent() {
             })}
           </div>
         </div>
+
+        {/* Dereceli / derecesiz */}
+        {gameMode && (
+          <div className="mb-6">
+            <div className="grid grid-cols-2 gap-1 p-1 bg-s2 border border-sep rounded-2xl">
+              {([false, true] as const).map((ranked) => (
+                <button
+                  key={String(ranked)}
+                  onClick={() => { setIsRanked(ranked); setStartError(''); }}
+                  className={`py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                    isRanked === ranked ? 'bg-s1 text-l1 shadow-sm' : 'text-l3'
+                  }`}
+                >
+                  {ranked ? 'Dereceli' : 'Derecesiz'}
+                </button>
+              ))}
+            </div>
+            <p className="text-l4 text-xs mt-2 leading-relaxed">
+              {isRanked
+                ? '4 oyuncunun da hesabı olmalı. Herkes kendi telefonundan onaylayınca oyun başlar; sonuç sıralamaya işlenir.'
+                : 'Sıralamaya sayılmaz. Misafir oyuncu eklenebilir; veriler yine kaydedilir.'}
+            </p>
+          </div>
+        )}
 
         {/* Takım İsimleri */}
         {gameMode === 'group' && (
@@ -337,86 +567,24 @@ function HomeContent() {
         {/* Oyuncular */}
         {gameMode && (
           <div className="mb-7">
-            <p className="text-l3 text-xs font-semibold uppercase tracking-wider mb-3">
-              Oyuncular{' '}
-              <span className="text-l4 normal-case font-normal">— ilk dağıtacağı seç</span>
+            <p className="text-l3 text-xs font-semibold uppercase tracking-wider mb-1">Oyuncular</p>
+            <p className="text-l4 text-xs mb-3 leading-relaxed">
+              Masadaki sırayla, sağa doğru gir · ilk dağıtacağı seç
+              {gameMode === 'group' && ' · takım arkadaşları karşılıklı oturur'}
             </p>
-            <div className="space-y-2">
-              {gameMode === 'group'
-                ? groupPlayerList.map(({ value, setter, team, teamLabel, pos }, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="dealer"
-                        checked={dealerIndex === idx}
-                        onChange={() => setDealerIndex(idx)}
-                        className="w-4 h-4 accent-[rgb(var(--ablue-rgb))] flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-[10px] font-semibold mb-1 ${
-                          team === 'blue' ? 'text-ablue/60' : 'text-apurple/60'
-                        }`}>
-                          {teamLabel}
-                        </div>
-                        <input
-                          type="text"
-                          placeholder={`Oyuncu ${pos}`}
-                          value={value}
-                          onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setter(e.target.value); }}
-                          maxLength={20}
-                          className={`${inputBase} ${
-                            team === 'blue' ? 'border-[var(--team1-border)]' : 'border-[var(--team2-border)]'
-                          }`}
-                        />
-                      </div>
-                    </div>
-                  ))
-                : playerList.map(({ value, setter }, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="dealer"
-                        checked={dealerIndex === idx}
-                        onChange={() => setDealerIndex(idx)}
-                        className="w-4 h-4 accent-[rgb(var(--ablue-rgb))] flex-shrink-0"
-                      />
-                      <input
-                        type="text"
-                        placeholder={`Oyuncu ${idx + 1}`}
-                        value={value}
-                        onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setter(e.target.value); }}
-                        maxLength={20}
-                        className={`${inputBase} border-sep flex-1`}
-                      />
-                    </div>
-                  ))}
-            </div>
+            {playerRows}
+            {(hasDuplicateNames || rankedProblem) && (
+              <p className="text-xs mt-3 leading-relaxed text-ared">
+                {hasDuplicateNames ? 'Aynı oyuncu iki kez eklenmiş' : rankedProblem}
+              </p>
+            )}
           </div>
         )}
 
-        {hasOngoingGame && (
-          <button
-            onClick={handleReturnToGame}
-            className="w-full mb-3 py-3.5 border border-[var(--warn-border)] bg-[var(--warn-bg)] text-ayellow rounded-2xl font-semibold text-sm active:scale-[0.98] transition-all"
-          >
-            Devam Eden Oyuna Dön
-          </button>
-        )}
-
-        <button
-          onClick={handleStartGame}
-          disabled={!canStartGame() || isStarting}
-          className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98] ${
-            canStartGame() && !isStarting
-              ? 'bg-ablue text-white hover:opacity-90'
-              : 'bg-s2 text-l4 cursor-not-allowed border border-sep'
-          }`}
-        >
-          {isStarting ? 'Başlatılıyor...' : 'Oyunu Başlat'}
-        </button>
+        {gameMode && startButton}
 
         {!gameMode && (
-          <p className="text-center text-l4 text-xs mt-6 leading-relaxed px-2">
+          <p className="text-center text-l4 text-xs mt-2 leading-relaxed px-2">
             101 oyunu 4 kişiyle oynanır. Grup modunda karşılıklı oturan oyuncular takım olur.
           </p>
         )}

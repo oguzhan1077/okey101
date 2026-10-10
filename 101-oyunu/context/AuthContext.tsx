@@ -9,7 +9,7 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: any }>
-  signUp: (email: string, password: string) => Promise<{ error: any }>
+  signUp: (email: string, password: string, displayName: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
   isSupabaseReady: boolean
 }
@@ -67,15 +67,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, displayName: string) => {
     if (!supabase) {
       return { error: { message: 'Supabase hazır değil' } }
     }
 
     try {
+      // display_name, kayıt trigger'ı tarafından profiles tablosuna yazılır
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: { data: { display_name: displayName.trim() } },
       })
       return { error }
     } catch (error) {

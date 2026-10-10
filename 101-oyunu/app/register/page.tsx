@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { CheckCircleIcon } from '@/components/Icons'
+import { NAME_REGEX, DISPLAY_NAME_MAX, validateDisplayName, isDisplayNameAvailable } from '@/lib/players'
 
 export default function RegisterPage() {
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -34,7 +36,26 @@ export default function RegisterPage() {
       return
     }
 
-    const { error } = await signUp(email, password)
+    const nameError = validateDisplayName(displayName)
+    if (nameError) {
+      setError(nameError)
+      setLoading(false)
+      return
+    }
+
+    try {
+      if (!(await isDisplayNameAvailable(displayName))) {
+        setError('Bu görünen ad başka bir oyuncu tarafından kullanılıyor')
+        setLoading(false)
+        return
+      }
+    } catch {
+      setError('Görünen ad kontrol edilemedi, tekrar deneyin')
+      setLoading(false)
+      return
+    }
+
+    const { error } = await signUp(email, password, displayName)
 
     if (error) {
       setError(error.message)
@@ -87,6 +108,23 @@ export default function RegisterPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="displayName" className="block text-sm font-medium text-l2 mb-2">
+                Görünen Ad
+              </label>
+              <input
+                id="displayName"
+                type="text"
+                value={displayName}
+                onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setDisplayName(e.target.value) }}
+                required
+                maxLength={DISPLAY_NAME_MAX}
+                className="w-full px-4 py-3 bg-s2 border border-sep rounded-xl text-l1 transition-colors"
+                placeholder="Oyunlarda görünecek adın"
+              />
+              <p className="text-l4 text-xs mt-1.5">Arkadaşların seni oyuna bu adla ekleyecek</p>
+            </div>
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-l2 mb-2">
                 E-posta
