@@ -330,6 +330,8 @@ export interface SyncState {
 
 const flushing = new Map<string, Promise<SyncState>>();
 const SAVE_TIMEOUT_MS = 20000;
+const MAX_ROUNDS_PER_FLUSH = 50;   // döngünün her durumda bitmesi için üst sınır
+const STORAGE_ERROR = 'Tarayıcı hafızasına yazılamıyor; sayfayı yenileyip tekrar dene';
 
 const TIMEOUT = Symbol('timeout');
 const withTimeout = <T,>(p: PromiseLike<T>, ms: number): Promise<T | typeof TIMEOUT> =>
@@ -337,7 +339,7 @@ const withTimeout = <T,>(p: PromiseLike<T>, ms: number): Promise<T | typeof TIME
 
 async function runFlush(gameId: string): Promise<SyncState> {
   try {
-    for (;;) {
+    for (let sent = 0; sent < MAX_ROUNDS_PER_FLUSH; sent++) {
       const list = getPendingRounds(gameId);
       if (!list.length) return { pending: 0, error: null, offline: false };
       const item = list[0];
@@ -375,7 +377,11 @@ async function runFlush(gameId: string): Promise<SyncState> {
       const rest = current.filter((p) => p.id !== item.id);
       for (const p of rest) if (p.roundNo === item.roundNo) p.baseRevision = data as number;
       setPendingRounds(gameId, rest);
+      // Hafızaya yazılamadıysa gönderilen el kuyrukta kalır; aynı eli tekrar tekrar göndermemek için dur
+      const after = getPendingRounds(gameId);
+      if (after.some((p) => p.id === item.id)) return { pending: after.length, error: STORAGE_ERROR, offline: false };
     }
+    return { pending: getPendingRounds(gameId).length, error: null, offline: true };
   } catch {
     return { pending: getPendingRounds(gameId).length, error: null, offline: true };
   }
