@@ -467,7 +467,7 @@ function GamePageContent() {
   if (loadState === 'notfound' || !game) {
     return centered(<>
       <p className="text-l1 font-semibold">{loadState === 'error' ? 'Oyun yüklenemedi' : 'Oyun bulunamadı'}</p>
-      <p className="text-l3 text-sm mt-1">{loadState === 'error' ? 'İnternet bağlantını kontrol et.' : 'Bağlantı hatalı olabilir.'}</p>
+      <p className="text-l3 text-sm mt-1">{loadState === 'error' ? 'İnternet bağlantını kontrol et.' : 'Bağlantı hatalı olabilir ya da bu oyunu görme yetkin yok. Oyunları sadece oyuncuları görebilir.'}</p>
       {loadState === 'error' && (
         <button onClick={() => { setLoadState('loading'); reload(); }} className="w-full mt-5 py-3 rounded-xl bg-s2 border border-sep text-l2 text-sm font-medium">
           Tekrar dene

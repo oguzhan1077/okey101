@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { gameMeta, roundMeta, newId } from '@/lib/clientMeta';
+import { gameMeta, roundMeta, newId, getDeviceId } from '@/lib/clientMeta';
 
 // Oyun verisi: tüm yazma işlemleri veritabanı fonksiyonlarıyla (008_fresh_start.sql).
 // Koltuklar (0–3) oyun yönündedir: koltuk+1 = sağdaki. Grup: 0+2 = 1. takım, 1+3 = 2. takım.
@@ -100,39 +100,31 @@ function isTransient(error: { code?: string; message?: string }): boolean {
 
 // ── Okuma ─────────────────────────────────────────────────────────────────────
 
-export async function loadGame(gameId: string, expiryChecked = false): Promise<LoadedGame | null> {
-  const client = db();
-  const [g, p, r, s, res] = await Promise.all([
-    client.from('games')
-      .select('id, mode, is_ranked, status, created_by, team1_name, team2_name, first_dealer_seat, round_count, started_at, winner_label, created_at, end_reason')
-      .eq('id', gameId).maybeSingle(),
-    client.from('game_players').select('seat, team, user_id, name, invite_status').eq('game_id', gameId).order('seat'),
-    client.from('rounds').select('round_no, dealer_seat, revision').eq('game_id', gameId).order('round_no'),
-    client.from('round_scores')
-      .select('round_no, seat, points, individual_penalty, team_penalty, okey1, okey2, finished, hand_finished, total')
-      .eq('game_id', gameId).order('round_no').order('seat'),
-    client.from('game_results')
-      .select('seat, final_score, place, okey_count, raw_diff, okey_luck, skill_score, rating_before, rating_after')
-      .eq('game_id', gameId).order('seat'),
-  ]);
-  for (const q of [g, p, r, s, res]) if (q.error) throw q.error;
-  if (!g.data) return null;
+interface RoundRow { round_no: number; dealer_seat: number | null; revision: number }
+interface ScoreRow {
+  round_no: number; seat: number; points: number; individual_penalty: number; team_penalty: number;
+  okey1: boolean; okey2: boolean; finished: boolean; hand_finished: boolean; total: number;
+}
+interface ResultRow {
+  seat: number; final_score: number; place: number; okey_count: number; raw_diff: number; okey_luck: number;
+  skill_score: number; rating_before: number | null; rating_after: number | null;
+}
 
-  // Onay bekleyen oyun: süre dolduysa sunucuya davetleri kapattır ve yeniden oku
-  let inviteExpiresAt: string | null = null;
-  if (g.data.status === 'pending') {
-    const { data: cfg } = await client.from('rating_config').select('invite_timeout_minutes').maybeSingle();
-    if (cfg) {
-      const expires = new Date(g.data.created_at).getTime() + cfg.invite_timeout_minutes * 60000;
-      inviteExpiresAt = new Date(expires).toISOString();
-      if (Date.now() >= expires && !expiryChecked) {
-        const { data: closed } = await client.rpc('expire_pending_invites');
-        if (Number(closed) > 0) return loadGame(gameId, true);
-      }
-    }
-  }
+/**
+ * Oyunun tamamı tek istekte. Oyun verisi gizli: sadece oyuncular, kuran ve (misafir oyununda)
+ * kuran cihaz görebilir. Görme yetkisi yoksa ya da oyun yoksa null döner.
+ */
+export async function loadGame(gameId: string): Promise<LoadedGame | null> {
+  const { data, error } = await db().rpc('get_game', { p_game_id: gameId, p_device_id: getDeviceId() });
+  if (error) throw error;
+  if (!data) return null;
+  const g = data.game as GameInfo & { invite_expires_at: string | null };
+  const seats = (data.players ?? []) as SeatInfo[];
+  const r = { data: (data.rounds ?? []) as RoundRow[] };
+  const s = { data: (data.scores ?? []) as ScoreRow[] };
+  const res = { data: (data.results ?? []) as ResultRow[] };
+  const inviteExpiresAt = g.invite_expires_at;
 
-  const seats = (p.data ?? []) as SeatInfo[];
   const scoresByRound = new Map<number, SeatScore[]>();
   for (const row of s.data ?? []) {
     const list = scoresByRound.get(row.round_no) ?? [];
@@ -173,7 +165,7 @@ export async function loadGame(gameId: string, expiryChecked = false): Promise<L
     };
   });
 
-  return { game: g.data as GameInfo, seats, rounds, results, inviteExpiresAt };
+  return { game: g as GameInfo, seats, rounds, results, inviteExpiresAt };
 }
 
 export interface InviteRow {
@@ -334,7 +326,7 @@ export async function respondInvite(gameId: string, accept: boolean): Promise<Ga
 
 /** Onay beklerken iptal / oynanırken yarıda bırakma */
 export async function endGameEarly(gameId: string): Promise<GameStatus> {
-  const { data, error } = await db().rpc('end_game_early', { p_game_id: gameId });
+  const { data, error } = await db().rpc('end_game_early', { p_game_id: gameId, p_device_id: getDeviceId() });
   if (error) throw error;
   return data as GameStatus;
 }
@@ -346,7 +338,7 @@ export interface FinishResult {
 }
 
 export async function finishGame(gameId: string): Promise<FinishResult> {
-  const { data, error } = await db().rpc('finish_game', { p_game_id: gameId });
+  const { data, error } = await db().rpc('finish_game', { p_game_id: gameId, p_device_id: getDeviceId() });
   if (error) throw error;
   return data as FinishResult;
 }
