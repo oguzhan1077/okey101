@@ -78,8 +78,10 @@ function PlayerContent() {
         ) : (
           <>
             {stats.badge && BADGE_LABELS[stats.badge] && (
-              <div className="flex items-center justify-center gap-1.5 mb-4 text-ayellow text-xs font-semibold">
-                <Badge badge={stats.badge} /> {BADGE_LABELS[stats.badge]}
+              <div className="flex justify-center mb-4">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[#C9921A]/40 bg-[#F7D774]/10 text-[#B7841A] dark:text-[#F7D774] text-xs font-semibold">
+                  <Badge badge={stats.badge} /> {BADGE_LABELS[stats.badge]}
+                </span>
               </div>
             )}
             <div className="grid grid-cols-2 gap-1 p-1 bg-s2 border border-sep rounded-2xl mb-5">
