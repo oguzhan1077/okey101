@@ -147,7 +147,7 @@ export default function LeaderboardPageView() {
 
         <p className="text-l4 text-xs mt-5 leading-relaxed">
           Herkes 1500 puanla başlar; puan 100'ün altına inmez. Sadece 4 oyuncunun da onayladığı dereceli oyunlar sayılır.
-          Puan, okey şansı düşülmüş beceriye göre değişir. İlk {PROVISIONAL_GAMES} oyunda puan daha büyük adımlarla
+          Puan, okey şansı düşülmüş beceriye göre değişir. İlk {PROVISIONAL_GAMES}{' '}oyunda puan daha büyük adımlarla
           değişir ki yeni oyuncu gerçek seviyesine çabuk otursun (&quot;ilk {PROVISIONAL_GAMES} oyun: 2/{PROVISIONAL_GAMES}&quot; bunu gösterir);
           2000 ve 2400 üstünde değişim yavaşlar.
           Oyuncuya dokunarak istatistiklerini görebilirsin.

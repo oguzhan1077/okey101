@@ -107,7 +107,7 @@ function PlayerContent() {
                 <div className="grid grid-cols-3 gap-2 mb-4">
                   <div className="bg-s1 border border-sep rounded-2xl px-3 py-3 text-center">
                     <div className="text-[10px] text-l3 uppercase tracking-widest">Elo</div>
-                    <div className="text-xl font-black text-l1 mt-0.5 tabular-nums">{m.rating === null ? '—' : fmt(m.rating, 0)}</div>
+                    <div className="text-xl font-black text-l1 mt-0.5 tabular-nums">{m.rating === null ? '—' : Math.round(m.rating)}</div>
                     <div className="text-[10px] text-l4">
                       {m.rated_games === null ? 'dereceli yok' : m.rated_games < PROVISIONAL_GAMES ? `ilk ${PROVISIONAL_GAMES} oyun: ${m.rated_games}/${PROVISIONAL_GAMES}` : `${m.rated_games} dereceli`}
                     </div>
