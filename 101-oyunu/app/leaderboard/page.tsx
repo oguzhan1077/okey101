@@ -7,6 +7,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { TrophyIcon } from '@/components/Icons';
 import { GameMode, LeaderboardPage, LEADERBOARD_PAGE_SIZE, fetchLeaderboardPage, fetchPlayerRank } from '@/lib/gameApi';
 import { formatTag } from '@/lib/players';
+import { Badge } from '@/components/Badge';
 
 const PROVISIONAL_GAMES = 10; // rating_config.provisional_games ile aynı
 
@@ -103,7 +104,7 @@ export default function LeaderboardPageView() {
                     <span className={`w-7 text-center text-sm font-bold tabular-nums ${r.rank <= 3 ? 'text-ablue' : 'text-l3'}`}>{r.rank}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-l1 text-sm font-semibold truncate">
-                        {r.display_name} <span className="text-l4 font-normal">{formatTag(r.tag)}</span>
+                        {r.display_name} <Badge badge={r.badge} /> <span className="text-l4 font-normal">{formatTag(r.tag)}</span>
                       </div>
                       <div className="text-l4 text-[11px]">
                         {r.games_played < PROVISIONAL_GAMES

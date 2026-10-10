@@ -4,6 +4,7 @@ export interface RegisteredPlayer {
   id: string;
   display_name: string;
   tag: number;
+  badge?: string | null;
 }
 
 /** Etiketin gösterimi: 7 → "#0007" */
@@ -38,13 +39,14 @@ export function validateDisplayName(name: string): string | null {
 export interface OwnProfile {
   display_name: string | null;
   tag: number | null;
+  badge: string | null;
 }
 
 export async function fetchOwnProfile(userId: string): Promise<OwnProfile | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('profiles')
-    .select('display_name, tag')
+    .select('display_name, tag, badge')
     .eq('id', userId)
     .maybeSingle();
   if (error) throw error;

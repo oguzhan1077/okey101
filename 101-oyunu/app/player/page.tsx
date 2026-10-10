@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { GameMode, ModeStats, PlayerStats, fetchPlayerStats } from '@/lib/gameApi';
 import { nameWithTag } from '@/lib/players';
+import { Badge, BADGE_LABELS } from '@/components/Badge';
 
 const PROVISIONAL_GAMES = 10; // rating_config.provisional_games ile aynı
 
@@ -59,7 +60,9 @@ function PlayerContent() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <h1 className="flex-1 text-center text-l1 font-bold text-base truncate">{stats?.display_name ? nameWithTag(stats.display_name, stats.tag) : 'Oyuncu'}</h1>
+          <h1 className="flex-1 text-center text-l1 font-bold text-base truncate">
+            {stats?.display_name ? nameWithTag(stats.display_name, stats.tag) : 'Oyuncu'} <Badge badge={stats?.badge} className="w-4 h-4" />
+          </h1>
           <ThemeToggle />
         </div>
       </div>
@@ -74,6 +77,11 @@ function PlayerContent() {
           </div>
         ) : (
           <>
+            {stats.badge && BADGE_LABELS[stats.badge] && (
+              <div className="flex items-center justify-center gap-1.5 mb-4 text-ayellow text-xs font-semibold">
+                <Badge badge={stats.badge} /> {BADGE_LABELS[stats.badge]}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-1 p-1 bg-s2 border border-sep rounded-2xl mb-5">
               {(['single', 'group'] as const).map((md) => (
                 <button

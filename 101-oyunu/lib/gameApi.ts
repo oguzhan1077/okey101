@@ -212,6 +212,7 @@ export interface LeaderboardRow {
   user_id: string;
   display_name: string;
   tag: number | null;
+  badge: string | null;
   rating: number;
   games_played: number;
 }
@@ -277,6 +278,7 @@ export interface PlayerStats {
   user_id: string;
   display_name: string | null;
   tag: number | null;
+  badge: string | null;
   modes: Partial<Record<GameMode, ModeStats>>;
   recent: RecentGame[];
 }

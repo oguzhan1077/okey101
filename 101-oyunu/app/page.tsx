@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { PersonIcon, PeopleIcon, LogoutIcon, TrophyIcon } from '@/components/Icons';
 import { Logo } from '@/components/Logo';
+import { Badge } from '@/components/Badge';
 import Link from 'next/link';
 import {
   NAME_REGEX, PLAYER_INPUT_REGEX, DISPLAY_NAME_MAX, RegisteredPlayer, normalizeName, searchPlayers,
@@ -54,6 +55,7 @@ function HomeContent() {
   // Kullanıcının kendi görünen adı ve etiketi
   const [ownName, setOwnName] = useState<string | null>(null);
   const [ownTag, setOwnTag] = useState<number | null>(null);
+  const [ownBadge, setOwnBadge] = useState<string | null>(null);
   const [ownNameLoaded, setOwnNameLoaded] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [nameError, setNameError] = useState('');
@@ -82,7 +84,7 @@ function HomeContent() {
       return;
     }
     fetchOwnProfile(user.id)
-      .then((p) => { setOwnName(p?.display_name ?? null); setOwnTag(p?.tag ?? null); })
+      .then((p) => { setOwnName(p?.display_name ?? null); setOwnTag(p?.tag ?? null); setOwnBadge(p?.badge ?? null); })
       .catch((error) => console.error('Görünen ad alınamadı:', error))
       .finally(() => setOwnNameLoaded(true));
   }, [user]);
@@ -311,7 +313,7 @@ function HomeContent() {
                         onClick={() => { setPlayer(idx, p.display_name, p); setSuggestions([]); setActiveInput(null); }}
                         className="w-full text-left px-4 py-3 text-sm text-l1 border-t border-sep first:border-t-0 active:bg-s2 hover:bg-s2"
                       >
-                        {p.display_name} <span className="text-l4">{formatTag(p.tag)}</span>
+                        {p.display_name} <Badge badge={p.badge} /> <span className="text-l4">{formatTag(p.tag)}</span>
                       </button>
                     ))}
                   </div>
@@ -488,7 +490,7 @@ function HomeContent() {
           <h1 className="text-4xl font-black text-l1 tracking-tight">101 Oyunu</h1>
           {ownName && user ? (
             <Link href={`/player?id=${user.id}`} className="text-l3 text-sm mt-1 inline-flex items-center gap-1">
-              Merhaba {nameWithTag(ownName, ownTag)} · <span className="text-ablue font-medium">İstatistiklerim</span>
+              Merhaba {nameWithTag(ownName, ownTag)} <Badge badge={ownBadge} /> · <span className="text-ablue font-medium">İstatistiklerim</span>
             </Link>
           ) : (
             <p className="text-l3 text-sm mt-1">Dijital skor takibi</p>
