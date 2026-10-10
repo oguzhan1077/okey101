@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { gameMeta, roundMeta } from '@/lib/clientMeta';
+import { gameMeta, roundMeta, newId } from '@/lib/clientMeta';
 
 // Oyun verisi: tüm yazma işlemleri veritabanı fonksiyonlarıyla (008_fresh_start.sql).
 // Koltuklar (0–3) oyun yönündedir: koltuk+1 = sağdaki. Grup: 0+2 = 1. takım, 1+3 = 2. takım.
@@ -289,7 +289,7 @@ function setPendingRounds(gameId: string, list: PendingRound[]) {
 
 export function enqueueRound(gameId: string, round: Omit<PendingRound, 'id' | 'error'>) {
   const list = getPendingRounds(gameId);
-  const item: PendingRound = { ...round, id: crypto.randomUUID() };
+  const item: PendingRound = { ...round, id: newId() };
   const existing = list.findIndex((p) => p.roundNo === round.roundNo);
   if (existing >= 0) {
     // Henüz gönderilmemiş eli düzeltme: sunucudaki sürüm aynı; yeni elde ilk giriş zamanları korunur
@@ -329,52 +329,66 @@ export interface SyncState {
 }
 
 const flushing = new Map<string, Promise<SyncState>>();
+const SAVE_TIMEOUT_MS = 20000;
 
+const TIMEOUT = Symbol('timeout');
+const withTimeout = <T,>(p: PromiseLike<T>, ms: number): Promise<T | typeof TIMEOUT> =>
+  Promise.race([p, new Promise<typeof TIMEOUT>((resolve) => setTimeout(() => resolve(TIMEOUT), ms))]);
+
+async function runFlush(gameId: string): Promise<SyncState> {
+  try {
+    for (;;) {
+      const list = getPendingRounds(gameId);
+      if (!list.length) return { pending: 0, error: null, offline: false };
+      const item = list[0];
+      const response = await withTimeout(db().rpc('save_round', {
+        p_game_id: gameId,
+        p_round_no: item.roundNo,
+        p_dealer_seat: item.dealerSeat,
+        p_scores: item.scores.map((s) => ({
+          points: s.points,
+          individual_penalty: s.individualPenalty,
+          team_penalty: s.teamPenalty,
+          okey1: s.okey1,
+          okey2: s.okey2,
+          finished: s.finished,
+          hand_finished: s.handFinished,
+          total: s.total,
+        })),
+        p_client_time: item.clientTime,
+        p_meta: roundMeta(item.entryStartedAt),
+        p_base_revision: item.baseRevision,
+      }), SAVE_TIMEOUT_MS);
+      // Cevap gelmedi: tekrar denenecek (sunucu aynı içeriği ikinci kez yazmaz)
+      if (response === TIMEOUT) return { pending: list.length, error: null, offline: true };
+
+      const { data, error } = response;
+      const current = getPendingRounds(gameId);
+      if (error) {
+        if (isTransient(error)) return { pending: current.length, error: null, offline: true };
+        const message = errorText(error);
+        for (const p of current) if (p.id === item.id) p.error = message;
+        setPendingRounds(gameId, current);
+        return { pending: current.length, error: message, offline: false };
+      }
+      // Gönderilirken aynı el tekrar düzeltildiyse o düzeltme kuyrukta kalır ve yeni sürümü bilmeli
+      const rest = current.filter((p) => p.id !== item.id);
+      for (const p of rest) if (p.roundNo === item.roundNo) p.baseRevision = data as number;
+      setPendingRounds(gameId, rest);
+    }
+  } catch {
+    return { pending: getPendingRounds(gameId).length, error: null, offline: true };
+  }
+}
+
+/** Bekleyen elleri sırayla gönderir. Aynı anda tek gönderim çalışır; diğer çağrılar onu bekler. */
 export function flushPendingRounds(gameId: string): Promise<SyncState> {
   const running = flushing.get(gameId);
   if (running) return running;
-  const job = (async (): Promise<SyncState> => {
-    try {
-      for (;;) {
-        const list = getPendingRounds(gameId);
-        if (!list.length) return { pending: 0, error: null, offline: false };
-        const item = list[0];
-        const { data, error } = await db().rpc('save_round', {
-          p_game_id: gameId,
-          p_round_no: item.roundNo,
-          p_dealer_seat: item.dealerSeat,
-          p_scores: item.scores.map((s) => ({
-            points: s.points,
-            individual_penalty: s.individualPenalty,
-            team_penalty: s.teamPenalty,
-            okey1: s.okey1,
-            okey2: s.okey2,
-            finished: s.finished,
-            hand_finished: s.handFinished,
-            total: s.total,
-          })),
-          p_client_time: item.clientTime,
-          p_meta: roundMeta(item.entryStartedAt),
-          p_base_revision: item.baseRevision,
-        });
-        if (error) {
-          if (isTransient(error)) return { pending: list.length, error: null, offline: true };
-          item.error = errorText(error);
-          setPendingRounds(gameId, list);
-          return { pending: list.length, error: item.error, offline: false };
-        }
-        // Gönderilirken aynı el tekrar düzeltildiyse o düzeltme kuyrukta kalır ve yeni sürümü bilmeli
-        const rest = getPendingRounds(gameId).filter((p) => p.id !== item.id);
-        for (const p of rest) if (p.roundNo === item.roundNo) p.baseRevision = data as number;
-        setPendingRounds(gameId, rest);
-      }
-    } catch {
-      const list = getPendingRounds(gameId);
-      return { pending: list.length, error: null, offline: true };
-    } finally {
-      flushing.delete(gameId);
-    }
-  })();
+  // Kilit, iş bittikten SONRA kaldırılır (.finally her zaman set'ten sonra çalışır)
+  const job = runFlush(gameId).finally(() => {
+    if (flushing.get(gameId) === job) flushing.delete(gameId);
+  });
   flushing.set(gameId, job);
   return job;
 }

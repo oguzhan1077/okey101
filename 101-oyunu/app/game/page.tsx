@@ -348,14 +348,20 @@ function GamePageContent() {
       total: getTotal(i),
     }));
 
-    enqueueRound(gameId, {
-      roundNo,
-      dealerSeat: existing?.dealerSeat ?? dealerForRound(game.first_dealer_seat, roundNo),
-      scores,
-      baseRevision: existing?.revision ?? 0,
-      clientTime: new Date().toISOString(),
-      entryStartedAt,
-    });
+    try {
+      enqueueRound(gameId, {
+        roundNo,
+        dealerSeat: existing?.dealerSeat ?? dealerForRound(game.first_dealer_seat, roundNo),
+        scores,
+        baseRevision: existing?.revision ?? 0,
+        clientTime: new Date().toISOString(),
+        entryStartedAt,
+      });
+    } catch (error) {
+      console.error('Round kuyruğa alınamadı:', error);
+      alert(`Round kaydedilemedi: ${errorText(error)}`);
+      return;
+    }
     setRounds((prev) => mergePending(gameId, prev));
     setSync((s) => ({ ...s, pending: getPendingRounds(gameId).length }));
     setEditingRoundNo(null);
