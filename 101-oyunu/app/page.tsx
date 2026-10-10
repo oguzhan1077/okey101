@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -8,8 +8,8 @@ import { PersonIcon, PeopleIcon, LogoutIcon, TrophyIcon } from '@/components/Ico
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 import {
-  NAME_REGEX, DISPLAY_NAME_MAX, RegisteredPlayer, normalizeName, findPlayerByName,
-  validateDisplayName, fetchRegisteredPlayers, fetchOwnDisplayName, saveOwnDisplayName,
+  NAME_REGEX, DISPLAY_NAME_MAX, RegisteredPlayer, normalizeName, searchPlayers,
+  validateDisplayName, fetchOwnDisplayName, saveOwnDisplayName,
 } from '@/lib/players';
 import {
   GameMode, InviteRow, ActiveGameRow, NewGamePlayer,
@@ -40,8 +40,16 @@ function HomeContent() {
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState('');
 
-  // Kayıtlı oyuncular ve kullanıcının kendi görünen adı
-  const [registeredPlayers, setRegisteredPlayers] = useState<RegisteredPlayer[]>([]);
+  // Koltuk başına seçilen kayıtlı hesap (null = misafir) ve ad önerileri (sunucuda aranır, en fazla 5)
+  const [playerIds, setPlayerIds] = useState<(string | null)[]>([null, null, null, null]);
+  const [activeInput, setActiveInput] = useState<number | null>(null);
+  const [suggestions, setSuggestions] = useState<RegisteredPlayer[]>([]);
+  const playerNamesRef = useRef(playerNames);
+  playerNamesRef.current = playerNames;
+  const playerIdsRef = useRef(playerIds);
+  playerIdsRef.current = playerIds;
+
+  // Kullanıcının kendi görünen adı
   const [ownName, setOwnName] = useState<string | null>(null);
   const [ownNameLoaded, setOwnNameLoaded] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -64,7 +72,6 @@ function HomeContent() {
 
   useEffect(() => {
     if (!user) {
-      setRegisteredPlayers([]);
       setOwnName(null);
       setOwnNameLoaded(false);
       setInvites([]);
@@ -75,9 +82,6 @@ function HomeContent() {
       .then(setOwnName)
       .catch((error) => console.error('Görünen ad alınamadı:', error))
       .finally(() => setOwnNameLoaded(true));
-    fetchRegisteredPlayers()
-      .then(setRegisteredPlayers)
-      .catch((error) => console.error('Oyuncu listesi alınamadı:', error));
   }, [user]);
 
   const refreshGames = useCallback(() => {
@@ -96,12 +100,47 @@ function HomeContent() {
 
   // Oyunu kuran kişi genelde masadadır: ilk oyuncuyu kendi adıyla doldur
   useEffect(() => {
-    if (ownName && gameMode && !playerNames[0]) setPlayerName(0, ownName);
+    if (ownName && user && gameMode && !playerNames[0]) setPlayer(0, ownName, user.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownName, gameMode]);
 
-  const setPlayerName = (index: number, value: string) => {
-    setPlayerNames((prev) => prev.map((n, i) => (i === index ? value : n)));
+  const setPlayer = (index: number, name: string, id: string | null) => {
+    setPlayerNames((prev) => prev.map((n, i) => (i === index ? name : n)));
+    setPlayerIds((prev) => prev.map((x, i) => (i === index ? id : x)));
+  };
+
+  // Yazılan ad bir hesabın adıyla tam eşleşiyorsa o hesaba bağla (başka koltukta seçili değilse)
+  const resolveExact = (index: number, query: string, list: RegisteredPlayer[]) => {
+    if (playerNamesRef.current[index].trim() !== query) return; // bu arada ad değişti
+    const exact = list.find((p) => normalizeName(p.display_name) === normalizeName(query));
+    if (!exact || playerIdsRef.current.some((x, i) => i !== index && x === exact.id)) return;
+    setPlayerIds((prev) => prev.map((x, i) => (i === index ? exact.id : x)));
+  };
+
+  // Yazdıkça öneri: odaktaki kutu için 200 ms bekleyip sunucuda ara
+  useEffect(() => {
+    if (!user || activeInput === null) { setSuggestions([]); return; }
+    const query = playerNames[activeInput].trim();
+    if (!query || playerIds[activeInput]) { setSuggestions([]); return; }
+    const index = activeInput;
+    const timer = setTimeout(() => {
+      searchPlayers(query)
+        .then((list) => {
+          resolveExact(index, query, list);
+          setSuggestions(list.filter((p) => !playerIdsRef.current.some((x, i) => i !== index && x === p.id)));
+        })
+        .catch(() => setSuggestions([]));
+    }, 200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, activeInput, playerNames, playerIds]);
+
+  // Kutudan çıkınca: ad yazılıp öneri seçilmediyse tam eşleşmeyi bir kez daha dene
+  const handlePlayerBlur = (index: number) => {
+    setActiveInput((cur) => (cur === index ? null : cur));
+    const query = playerNames[index].trim();
+    if (!user || !query || playerIds[index]) return;
+    searchPlayers(query).then((list) => resolveExact(index, query, list)).catch(() => {});
   };
 
   const chooseMode = (mode: GameMode) => {
@@ -122,7 +161,6 @@ function HomeContent() {
       else if (result === 'invalid') setNameError('Görünen ad geçersiz');
       else {
         setOwnName(nameInput.trim());
-        fetchRegisteredPlayers().then(setRegisteredPlayers).catch(() => {});
       }
     } catch (error) {
       console.error('Görünen ad kaydedilemedi:', error);
@@ -149,11 +187,11 @@ function HomeContent() {
     }
   };
 
-  // Yazılan isimleri kayıtlı hesaplara eşle; eşleşmeyen isim misafir sayılır
-  const resolvedPlayers = playerNames.map((name) => {
-    const registered = user ? findPlayerByName(registeredPlayers, name) : undefined;
-    return { name: registered ? registered.display_name : name.trim().replace(/\s+/g, ' '), id: registered?.id ?? null };
-  });
+  // Hesaba bağlanmayan isim misafir sayılır
+  const resolvedPlayers = playerNames.map((name, i) => ({
+    name: name.trim().replace(/\s+/g, ' '),
+    id: user ? playerIds[i] : null,
+  }));
 
   const hasDuplicateNames = (() => {
     const keys = resolvedPlayers.map((p) => normalizeName(p.name)).filter(Boolean);
@@ -225,25 +263,40 @@ function HomeContent() {
               <div className={`text-[10px] font-semibold mb-1 ${team === 1 ? 'text-ablue/70' : team === 2 ? 'text-apurple/70' : 'text-l4'}`}>
                 {hints[idx]}{team ? ` · ${teamLabel}` : ''}
               </div>
-              <input
-                type="text"
-                list={user ? 'registered-players' : undefined}
-                placeholder={`Oyuncu ${idx + 1}`}
-                value={playerNames[idx]}
-                onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setPlayerName(idx, e.target.value); }}
-                maxLength={20}
-                className={`${inputBase} ${team === 1 ? 'border-[var(--team1-border)]' : team === 2 ? 'border-[var(--team2-border)]' : 'border-sep'}`}
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  autoComplete="off"
+                  placeholder={`Oyuncu ${idx + 1}`}
+                  value={playerNames[idx]}
+                  onChange={(e) => { if (NAME_REGEX.test(e.target.value)) setPlayer(idx, e.target.value, null); }}
+                  onFocus={() => setActiveInput(idx)}
+                  onBlur={() => handlePlayerBlur(idx)}
+                  maxLength={20}
+                  className={`${inputBase} ${team === 1 ? 'border-[var(--team1-border)]' : team === 2 ? 'border-[var(--team2-border)]' : 'border-sep'}`}
+                />
+                {activeInput === idx && suggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-s1 border border-sep rounded-xl shadow-lg overflow-hidden">
+                    {suggestions.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        // Seçim, kutudan çıkış (blur) olayından önce işlensin
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => { setPlayer(idx, p.display_name, p.id); setSuggestions([]); setActiveInput(null); }}
+                        className="w-full text-left px-4 py-3 text-sm text-l1 border-t border-sep first:border-t-0 active:bg-s2 hover:bg-s2"
+                      >
+                        {p.display_name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             {playerTag(idx)}
           </div>
         );
       })}
-      {user && (
-        <datalist id="registered-players">
-          {registeredPlayers.map((p) => <option key={p.id} value={p.display_name} />)}
-        </datalist>
-      )}
     </div>
   );
 

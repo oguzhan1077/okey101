@@ -12,6 +12,7 @@
 --    Formül sürümü v2. finish_game bu yüzden yeniden tanımlanır.
 -- 4. get_player_stats: sıralamada oyuncuya tıklayınca gösterilen istatistikler.
 -- 5. Davetler 5 dakikada yanıtlanmazsa süresi dolar (expired); dereceli oyun iptal olur.
+-- 6. Oyuncu arama sunucuda (en fazla 5 öneri), sıralama sayfalı (10'ar).
 
 -- ── 1–2. Yazma yetkisi ve iptal ─────────────────────────────────────────────
 
@@ -520,6 +521,78 @@ REVOKE EXECUTE ON FUNCTION public.expire_pending_invites(), public.my_invites() 
 -- Onay bekleme ekranı, oyunu okurken süresi dolanları kapatabilsin diye herkese açık (sadece kuralı uygular)
 GRANT EXECUTE ON FUNCTION public.expire_pending_invites() TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.my_invites() TO authenticated;
+
+-- ── 6. Oyuncu arama ve sayfalı sıralama ─────────────────────────────────────
+-- Oyuncu sayısı artınca tüm listeyi indirmek yerine sunucuda aranır (en fazla 5 öneri)
+-- ve sıralama sayfa sayfa (10'ar) okunur. Eski list_players/get_leaderboard, yeni arayüz
+-- yayına çıkana kadar eski sürüm kullandığı için duruyor.
+
+-- Türkçe büyük/küçük harf duyarsız karşılaştırma anahtarı (İ→i, I→ı)
+CREATE OR REPLACE FUNCTION public.name_key(p TEXT)
+RETURNS TEXT
+LANGUAGE sql IMMUTABLE
+AS $$
+  SELECT lower(translate(trim(regexp_replace(coalesce(p, ''), '\s+', ' ', 'g')), 'İIĞÜŞÖÇ', 'iığüşöç'));
+$$;
+
+-- Ada göre oyuncu arama: önce tam eşleşme, sonra başı uyanlar, sonra içinde geçenler
+CREATE OR REPLACE FUNCTION public.search_players(p_query TEXT, p_limit INTEGER DEFAULT 5)
+RETURNS TABLE (id UUID, display_name TEXT)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  WITH q AS (SELECT name_key(p_query) AS k)
+  SELECT p.id, p.display_name
+  FROM profiles p, q
+  WHERE q.k <> ''
+    AND p.display_name IS NOT NULL AND p.deleted_at IS NULL
+    AND position(q.k IN name_key(p.display_name)) > 0
+  ORDER BY name_key(p.display_name) = q.k DESC,
+           starts_with(name_key(p.display_name), q.k) DESC,
+           p.display_name
+  LIMIT least(greatest(coalesce(p_limit, 5), 1), 10);
+$$;
+
+-- Sayfalı sıralama; rank tüm listedeki sıra, total_count toplam oyuncu sayısı
+CREATE OR REPLACE FUNCTION public.get_leaderboard_page(p_mode TEXT, p_limit INTEGER DEFAULT 10, p_offset INTEGER DEFAULT 0)
+RETURNS TABLE (rank BIGINT, user_id UUID, display_name TEXT, rating NUMERIC, games_played INTEGER, total_count BIGINT)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  WITH ranked AS (
+    SELECT row_number() OVER (ORDER BY r.rating DESC, r.games_played DESC, p.display_name) AS rank,
+           r.user_id, p.display_name, round(r.rating) AS rating, r.games_played,
+           count(*) OVER () AS total_count
+    FROM player_ratings r
+    JOIN profiles p ON p.id = r.user_id
+    WHERE r.mode = p_mode AND r.games_played > 0 AND p.deleted_at IS NULL
+  )
+  SELECT * FROM ranked
+  ORDER BY rank
+  LIMIT least(greatest(coalesce(p_limit, 10), 1), 50)
+  OFFSET greatest(coalesce(p_offset, 0), 0);
+$$;
+
+-- Bir oyuncunun sıralamadaki yeri (sıralamada yoksa NULL)
+CREATE OR REPLACE FUNCTION public.get_player_rank(p_mode TEXT, p_user_id UUID)
+RETURNS BIGINT
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT x.rank FROM (
+    SELECT r.user_id,
+           row_number() OVER (ORDER BY r.rating DESC, r.games_played DESC, p.display_name) AS rank
+    FROM player_ratings r
+    JOIN profiles p ON p.id = r.user_id
+    WHERE r.mode = p_mode AND r.games_played > 0 AND p.deleted_at IS NULL
+  ) x
+  WHERE x.user_id = p_user_id;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.name_key(TEXT), public.search_players(TEXT, INTEGER),
+  public.get_leaderboard_page(TEXT, INTEGER, INTEGER), public.get_player_rank(TEXT, UUID)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.name_key(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.search_players(TEXT, INTEGER) TO authenticated;   -- oyuncu eklemek giriş ister
+GRANT EXECUTE ON FUNCTION public.get_leaderboard_page(TEXT, INTEGER, INTEGER) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_player_rank(TEXT, UUID) TO anon, authenticated;
 
 -- Şu an süresi geçmiş halde bekleyen davetleri hemen kapat
 SELECT expire_pending_invites();

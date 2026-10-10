@@ -215,10 +215,30 @@ export interface LeaderboardRow {
   games_played: number;
 }
 
-export async function fetchLeaderboard(mode: GameMode): Promise<LeaderboardRow[]> {
-  const { data, error } = await db().rpc('get_leaderboard', { p_mode: mode });
+export const LEADERBOARD_PAGE_SIZE = 10;
+
+export interface LeaderboardPage {
+  rows: (LeaderboardRow & { rank: number })[];
+  total: number;
+}
+
+export async function fetchLeaderboardPage(mode: GameMode, page: number): Promise<LeaderboardPage> {
+  const { data, error } = await db().rpc('get_leaderboard_page', {
+    p_mode: mode, p_limit: LEADERBOARD_PAGE_SIZE, p_offset: page * LEADERBOARD_PAGE_SIZE,
+  });
   if (error) throw error;
-  return ((data ?? []) as LeaderboardRow[]).map((r) => ({ ...r, rating: Number(r.rating) }));
+  const rows = (data ?? []) as (LeaderboardRow & { rank: number; total_count: number })[];
+  return {
+    rows: rows.map((r) => ({ ...r, rank: Number(r.rank), rating: Number(r.rating) })),
+    total: rows.length ? Number(rows[0].total_count) : 0,
+  };
+}
+
+/** Oyuncunun sıralamadaki yeri (1'den başlar); sıralamada yoksa null */
+export async function fetchPlayerRank(mode: GameMode, userId: string): Promise<number | null> {
+  const { data, error } = await db().rpc('get_player_rank', { p_mode: mode, p_user_id: userId });
+  if (error) throw error;
+  return data === null ? null : Number(data);
 }
 
 export interface ModeStats {

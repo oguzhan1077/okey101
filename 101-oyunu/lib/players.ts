@@ -14,12 +14,6 @@ export function normalizeName(name: string): string {
   return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('tr');
 }
 
-export function findPlayerByName(players: RegisteredPlayer[], name: string): RegisteredPlayer | undefined {
-  const key = normalizeName(name);
-  if (!key) return undefined;
-  return players.find((p) => normalizeName(p.display_name) === key);
-}
-
 /** Görünen ad kurallarına uymuyorsa hata mesajı, uyuyorsa null döner */
 export function validateDisplayName(name: string): string | null {
   const trimmed = name.trim();
@@ -34,14 +28,6 @@ export async function isDisplayNameAvailable(name: string): Promise<boolean> {
   const { data, error } = await supabase.rpc('is_display_name_available', { p_name: name.trim() });
   if (error) throw error;
   return data === true;
-}
-
-/** Kayıtlı oyuncular (sadece giriş yapmış kullanıcı çağırabilir) */
-export async function fetchRegisteredPlayers(): Promise<RegisteredPlayer[]> {
-  if (!supabase) return [];
-  const { data, error } = await supabase.rpc('list_players');
-  if (error) throw error;
-  return (data ?? []) as RegisteredPlayer[];
 }
 
 export async function fetchOwnDisplayName(userId: string): Promise<string | null> {
@@ -61,4 +47,14 @@ export async function saveOwnDisplayName(name: string): Promise<'ok' | 'taken' |
   const { data, error } = await supabase.rpc('set_display_name', { p_name: name.trim() });
   if (error) throw error;
   return data as 'ok' | 'taken' | 'invalid';
+}
+
+export const PLAYER_SUGGESTION_LIMIT = 5;
+
+/** Ada göre kayıtlı oyuncu arar (sunucuda; en fazla 5 sonuç, tam eşleşme önce) */
+export async function searchPlayers(query: string): Promise<RegisteredPlayer[]> {
+  if (!supabase || !query.trim()) return [];
+  const { data, error } = await supabase.rpc('search_players', { p_query: query, p_limit: PLAYER_SUGGESTION_LIMIT });
+  if (error) throw error;
+  return (data ?? []) as RegisteredPlayer[];
 }
