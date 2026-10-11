@@ -1,15 +1,17 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
-import { GameMode, ModeBaseline, ModeStats, PlayerStats, fetchPlayerStats } from '@/lib/gameApi';
+import { GameMode, ModeBaseline, ModeStats, PlayerStats, StatsKind, fetchPlayerStats } from '@/lib/gameApi';
 import { nameWithTag } from '@/lib/players';
 import { Badge, BADGE_LABELS } from '@/components/Badge';
 
 const PROVISIONAL_GAMES = 10; // rating_config.provisional_games ile aynı
+
+const KIND_LABELS: Record<StatsKind, string> = { ranked: 'Dereceli', unranked: 'Derecesiz', all: 'Tümü' };
 
 const fmt = (v: number | null | undefined, digits = 1) =>
   v === null || v === undefined ? '—' : Number(v).toLocaleString('tr-TR', { maximumFractionDigits: digits, minimumFractionDigits: 0 });
@@ -46,19 +48,27 @@ function PlayerContent() {
   const userId = useSearchParams().get('id');
   const [stats, setStats] = useState<PlayerStats | null | undefined>(undefined);
   const [mode, setMode] = useState<GameMode>('single');
+  const [kind, setKind] = useState<StatsKind>('ranked');
+  const modePickedFor = useRef<string | null>(null);
   const { user } = useAuth();
   const isSelf = !!user && user.id === userId;
 
   useEffect(() => {
     if (!userId) { setStats(null); return; }
-    fetchPlayerStats(userId)
+    let cancelled = false;  // süzgeç hızlı değişirse eski cevap yenisinin üstüne yazmasın
+    fetchPlayerStats(userId, kind)
       .then((s) => {
+        if (cancelled) return;
         setStats(s);
-        // Daha çok oynadığı modla aç
-        if (s && (s.modes.group?.games ?? 0) > (s.modes.single?.games ?? 0)) setMode('group');
+        // İlk açılışta daha çok oynadığı modla aç; süzgeç değişince seçili mod kalır
+        if (s && modePickedFor.current !== userId) {
+          modePickedFor.current = userId;
+          if ((s.modes.group?.games ?? 0) > (s.modes.single?.games ?? 0)) setMode('group');
+        }
       })
-      .catch(() => setStats(null));
-  }, [userId]);
+      .catch(() => { if (!cancelled) setStats(null); });
+    return () => { cancelled = true; };
+  }, [userId, kind]);
 
   const m: ModeStats | undefined = stats?.modes[mode];
   const b: ModeBaseline | undefined = stats?.baseline?.[mode];
@@ -102,7 +112,7 @@ function PlayerContent() {
                 </span>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-1 p-1 bg-s2 border border-sep rounded-2xl mb-5">
+            <div className="grid grid-cols-2 gap-1 p-1 bg-s2 border border-sep rounded-2xl mb-3">
               {(['single', 'group'] as const).map((md) => (
                 <button
                   key={md}
@@ -114,10 +124,22 @@ function PlayerContent() {
                 </button>
               ))}
             </div>
+            <div className="flex justify-center gap-1 mb-5">
+              {(['ranked', 'unranked', 'all'] as const).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setKind(k)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                    kind === k ? 'bg-ablue border-ablue text-white' : 'bg-s1 border-sep text-l3'}`}
+                >
+                  {KIND_LABELS[k]}
+                </button>
+              ))}
+            </div>
 
             {!m ? (
               <p className="text-l4 text-sm text-center py-10">
-                Henüz bitmiş {mode === 'single' ? 'tekli' : 'grup'} oyunu yok.
+                Henüz bitmiş {kind === 'all' ? '' : `${KIND_LABELS[kind].toLocaleLowerCase('tr')} `}{mode === 'single' ? 'tekli' : 'grup'} oyunu yok.
               </p>
             ) : (
               <>
@@ -184,7 +206,7 @@ function PlayerContent() {
                     value={signed(m.skill_per_game)}
                     tone={m.skill_per_game > 0 ? 'good' : m.skill_per_game < 0 ? 'bad' : undefined}
                   />
-                  <StatRow label="Dereceli oyun" value={String(m.ranked_games)} />
+                  {kind === 'all' && <StatRow label="Dereceli oyun" value={String(m.ranked_games)} />}
                 </div>
 
                 {/* Son oyunlar */}

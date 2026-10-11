@@ -293,8 +293,11 @@ export interface ModeBaseline {
   win_pct: number;
 }
 
-export async function fetchPlayerStats(userId: string): Promise<PlayerStats | null> {
-  const { data, error } = await db().rpc('get_player_stats', { p_user_id: userId });
+/** Profil istatistiklerinin süzgeci; Elo her zaman dereceli oyunlardan gelir */
+export type StatsKind = 'ranked' | 'unranked' | 'all';
+
+export async function fetchPlayerStats(userId: string, kind: StatsKind = 'all'): Promise<PlayerStats | null> {
+  const { data, error } = await db().rpc('get_player_stats', { p_user_id: userId, p_kind: kind });
   if (error) throw error;
   return (data ?? null) as PlayerStats | null;
 }
