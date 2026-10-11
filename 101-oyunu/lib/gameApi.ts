@@ -30,6 +30,7 @@ export interface SeatInfo {
   user_id: string | null;
   name: string;
   invite_status: InviteStatus;
+  badge?: string | null;  // hesabın rozeti (misafirde yok)
 }
 
 export interface SeatScore {
@@ -173,7 +174,9 @@ export interface InviteRow {
   mode: GameMode;
   is_ranked: boolean;
   creator_name: string | null;
+  creator_badge?: string | null;
   players: string[];
+  player_badges?: (string | null)[];  // players ile aynı sırada
   created_at: string;
   expires_at: string;
 }
@@ -190,6 +193,7 @@ export interface ActiveGameRow {
   is_ranked: boolean;
   status: GameStatus;
   players: string[];
+  player_badges?: (string | null)[];  // players ile aynı sırada
   round_count: number;
   created_at: string;
 }

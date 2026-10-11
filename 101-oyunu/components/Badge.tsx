@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { Fragment, useId } from 'react';
 
 // Adın yanındaki rozet (profiles.badge): onay işaretli mühür.
 // Şimdilik tek rozet: kurucu üye (altın). İleride premium üyelik eklenirse aynı mühür başka renkte.
@@ -47,5 +47,19 @@ export function Badge({ badge, className = 'w-4 h-4' }: BadgeProps) {
       <path d={SEAL} fill={`url(#${gradientId})`} />
       <path d="m8.5 12 2.5 2.5 4.5-5" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+/** "Ali · Oğuzhan 🏅 · Can" — badges, names ile aynı sırada (koltuk sırası) */
+export function PlayerList({ names, badges }: { names: string[]; badges?: (string | null)[] | null }) {
+  return (
+    <>
+      {names.map((name, i) => (
+        <Fragment key={i}>
+          {i > 0 && ' · '}
+          {name}{badges?.[i] && <> <Badge badge={badges[i]} className="w-3.5 h-3.5" /></>}
+        </Fragment>
+      ))}
+    </>
   );
 }

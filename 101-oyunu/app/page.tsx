@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { PersonIcon, PeopleIcon, LogoutIcon, TrophyIcon } from '@/components/Icons';
 import { Logo } from '@/components/Logo';
-import { Badge } from '@/components/Badge';
+import { Badge, PlayerList } from '@/components/Badge';
 import Link from 'next/link';
 import {
   NAME_REGEX, PLAYER_INPUT_REGEX, DISPLAY_NAME_MAX, RegisteredPlayer, normalizeName, searchPlayers,
@@ -106,7 +106,7 @@ function HomeContent() {
   // Oyunu kuran kişi genelde masadadır: ilk oyuncuyu kendi adıyla doldur
   useEffect(() => {
     if (ownName && user && gameMode && !playerNames[0] && ownTag !== null) {
-      setPlayer(0, ownName, { id: user.id, display_name: ownName, tag: ownTag });
+      setPlayer(0, ownName, { id: user.id, display_name: ownName, tag: ownTag, badge: ownBadge });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownName, ownTag, gameMode]);
@@ -264,9 +264,9 @@ function HomeContent() {
     const pick = playerPicks[index];
     const ambiguous = !pick && ambiguousSeats[index];
     return (
-      <span className={`w-14 flex-shrink-0 text-[10px] font-semibold text-right ${
+      <span className={`w-16 flex-shrink-0 text-[10px] font-semibold text-right ${
         pick ? 'text-agreen' : ambiguous ? 'text-ayellow' : isRanked ? 'text-ared' : 'text-l4'}`}>
-        {pick ? formatTag(pick.tag) : ambiguous ? 'Listeden seç' : 'Misafir'}
+        {pick ? <><Badge badge={pick.badge} className="w-3 h-3 mr-0.5" />{formatTag(pick.tag)}</> : ambiguous ? 'Listeden seç' : 'Misafir'}
       </span>
     );
   };
@@ -532,7 +532,7 @@ function HomeContent() {
             {invites.map((inv) => (
               <div key={inv.game_id} className="p-4 bg-s1 border-2 border-ablue rounded-2xl">
                 <p className="text-l1 text-sm font-semibold">
-                  {inv.creator_name ?? 'Biri'} seni oyuna ekledi
+                  {inv.creator_name ?? 'Biri'} <Badge badge={inv.creator_badge} /> seni oyuna ekledi
                 </p>
                 <p className="text-l3 text-xs mt-0.5">
                   {modeLabel(inv.mode, inv.is_ranked)}
@@ -541,7 +541,7 @@ function HomeContent() {
                     {Math.max(1, Math.ceil((new Date(inv.expires_at).getTime() - Date.now()) / 60000))} dk içinde onayla
                   </span>
                 </p>
-                <p className="text-l2 text-xs mt-2">{inv.players.join(' · ')}</p>
+                <p className="text-l2 text-xs mt-2"><PlayerList names={inv.players} badges={inv.player_badges} /></p>
                 <div className="grid grid-cols-2 gap-2 mt-3">
                   <button
                     onClick={() => handleInvite(inv.game_id, false)}
@@ -577,7 +577,7 @@ function HomeContent() {
                   <span className="text-ayellow text-xs font-semibold">{modeLabel(g.mode, g.is_ranked)}</span>
                   <span className="text-l3 text-xs">{g.status === 'pending' ? 'Onay bekliyor' : `${g.round_count} el`}</span>
                 </div>
-                <p className="text-l1 text-sm mt-1.5">{g.players.join(' · ')}</p>
+                <p className="text-l1 text-sm mt-1.5"><PlayerList names={g.players} badges={g.player_badges} /></p>
               </button>
             ))}
           </div>
