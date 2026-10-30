@@ -15,6 +15,7 @@ import {
 import {
   GameMode, InviteRow, ActiveGameRow, NewGamePlayer,
   createGame, respondInvite, fetchMyInvites, fetchMyActiveGames, errorText,
+  openUserSignal, notifyUsers, notifyGame,
 } from '@/lib/gameApi';
 
 const inputBase = 'w-full px-4 py-3.5 bg-s2 border rounded-xl text-l1 text-base transition-colors';
@@ -95,12 +96,23 @@ function HomeContent() {
     fetchMyActiveGames().then(setActiveGames).catch(() => {});
   }, [user]);
 
-  // Davetler masadakilerin telefonuna buradan düşer: sayfa açıkken düzenli kontrol
+  // Davetler masadakilerin telefonuna buradan düşer: oyun kurulunca anında sinyal gelir;
+  // sinyal kaçarsa diye sayfa açıkken seyrek kontrol, telefona dönünce de hemen kontrol
   useEffect(() => {
     if (!user) return;
     refreshGames();
-    const timer = setInterval(() => { if (document.visibilityState === 'visible') refreshGames(); }, 8000);
-    return () => clearInterval(timer);
+    const signal = openUserSignal(user.id, refreshGames);
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') refreshGames(); }, 15000);
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshGames(); };
+    const onPageShow = (e: PageTransitionEvent) => { if (e.persisted) refreshGames(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      signal.close();
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pageshow', onPageShow);
+    };
   }, [user, refreshGames]);
 
   // Oyunu kuran kişi genelde masadadır: ilk oyuncuyu kendi adıyla doldur
@@ -189,6 +201,7 @@ function HomeContent() {
     setRespondingId(gameId);
     try {
       const status = await respondInvite(gameId, accept);
+      notifyGame(gameId);
       if (accept && (status === 'active' || status === 'pending')) {
         router.push(`/game?id=${gameId}`);
         return;
@@ -249,6 +262,7 @@ function HomeContent() {
         setupStartedAt,
       });
       try { localStorage.setItem(ACTIVE_GAME_KEY, gameId); } catch { /* depolama kapalı */ }
+      notifyUsers(resolvedPlayers.flatMap((p) => (p.id && p.id !== user?.id ? [p.id] : [])));
       router.push(`/game?id=${gameId}`);
     } catch (error) {
       console.error('Oyun kurulamadı:', error);

@@ -11,6 +11,7 @@ import {
   GameInfo, SeatInfo, RoundRecord, GameResultRow, SeatScore, SyncState,
   loadGame, mergePending, enqueueRound, flushPendingRounds, getPendingRounds, discardPendingRounds,
   finishGame, endGameEarly, respondInvite, dealerForRound, errorText,
+  openGameSignal, openUserSignal, fetchMyActiveGames,
 } from '@/lib/gameApi';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -85,7 +86,7 @@ function GamePageContent() {
 
   // ── Yükleme ve senkronizasyon ────────────────────────────────────────────────
 
-  const reload = useCallback(async () => {
+  const loadOnce = useCallback(async () => {
     if (!gameId) return;
     try {
       const data = await loadGame(gameId);
@@ -105,13 +106,40 @@ function GamePageContent() {
     }
   }, [gameId]);
 
+  // Aynı anda tek yükleme: sinyal, ekrana dönüş ve zamanlayıcı üst üste gelirse istekler birleşir,
+  // eski cevap yenisinin üzerine yazılmaz. Yükleme sürerken gelen istek bitince bir kez daha okutur.
+  const inFlightRef = useRef<Promise<void> | null>(null);
+  const againRef = useRef(false);
+  const reload = useCallback((): Promise<void> => {
+    if (inFlightRef.current) { againRef.current = true; return inFlightRef.current; }
+    const run = async () => {
+      do { againRef.current = false; await loadOnce(); } while (againRef.current);
+    };
+    const job = run().finally(() => { inFlightRef.current = null; });
+    inFlightRef.current = job;
+    return job;
+  }, [loadOnce]);
+
+  // Masadaki diğer telefonlara "oyun değişti" sinyali; gelen sinyalde sunucudan yeniden okunur
+  const signalRef = useRef<{ send: () => void } | null>(null);
+  const notifyOthers = useCallback(() => signalRef.current?.send(), []);
+
   const flush = useCallback(async () => {
     if (!gameId) return;
     const before = getPendingRounds(gameId).length;
     const state = await flushPendingRounds(gameId);
     setSync(state);
-    if (before > state.pending) await reload();
-  }, [gameId, reload]);
+    if (before > state.pending) {
+      notifyOthers();
+      await reload();
+    }
+  }, [gameId, reload, notifyOthers]);
+
+  const refresh = useCallback(() => {
+    if (!gameId) return;
+    if (getPendingRounds(gameId).length) flush();
+    else reload();
+  }, [gameId, flush, reload]);
 
   useEffect(() => {
     if (!gameId) { setLoadState('notfound'); return; }
@@ -119,19 +147,56 @@ function GamePageContent() {
     reload().then(flush);
   }, [gameId, reload, flush]);
 
-  // Diğer telefonlardan girilen elleri ve onayları görmek için düzenli kontrol
+  useEffect(() => {
+    if (!gameId) return;
+    const signal = openGameSignal(gameId, refresh);
+    signalRef.current = signal;
+    return () => { signalRef.current = null; signal.close(); };
+  }, [gameId, refresh]);
+
+  // Telefon kilitten/arka plandan dönünce hemen güncelle (beklemiş zamanlayıcıyı bekleme)
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
+    const onPageShow = (e: PageTransitionEvent) => { if (e.persisted) refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pageshow', onPageShow);
+    };
+  }, [refresh]);
+
+  // Sinyal kaçarsa diye seyrek yedek kontrol (sinyal bağlantısı kurulamazsa da çalışır)
   const status = game?.status;
   useEffect(() => {
     if (!gameId || !status || !['pending', 'active'].includes(status)) return;
     const timer = setInterval(() => {
       if (document.visibilityState !== 'visible' || viewRef.current !== 'scoreboard') return;
-      if (getPendingRounds(gameId).length) flush();
-      else reload();
-    }, status === 'pending' ? 4000 : 15000);
+      refresh();
+    }, status === 'pending' ? 10000 : 20000);
     const onOnline = () => flush();
     window.addEventListener('online', onOnline);
     return () => { clearInterval(timer); window.removeEventListener('online', onOnline); };
-  }, [gameId, status, flush, reload]);
+  }, [gameId, status, flush, refresh]);
+
+  // Bitmiş oyunda kalan telefon: aynı kişilerle yeni oyun kurulunca haber ver
+  const [nextGameId, setNextGameId] = useState<string | null>(null);
+  const isOverStatus = status === 'finished' || status === 'abandoned';
+  const gameCreatedAt = game?.created_at;
+  useEffect(() => {
+    if (!user || !gameId || !isOverStatus || !gameCreatedAt) { setNextGameId(null); return; }
+    const since = new Date(gameCreatedAt).getTime();
+    const check = () => {
+      fetchMyActiveGames()
+        .then((list) => setNextGameId(list.find((g) => new Date(g.created_at).getTime() > since)?.game_id ?? null))
+        .catch(() => {});
+    };
+    check();
+    const signal = openUserSignal(user.id, check);
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { signal.close(); document.removeEventListener('visibilitychange', onVisible); };
+  }, [user, gameId, isOverStatus, gameCreatedAt]);
 
   // Onay beklerken geri sayım
   useEffect(() => {
@@ -402,6 +467,7 @@ function GamePageContent() {
         return;
       }
       await finishGame(gameId);
+      notifyOthers();
       await reload();
       setConfirmAction(null);
       setShowCalculation(false);
@@ -421,6 +487,7 @@ function GamePageContent() {
     try {
       await flushPendingRounds(gameId);
       await endGameEarly(gameId);
+      notifyOthers();
       router.push('/');
     } catch (error) {
       setActionError(errorText(error));
@@ -433,6 +500,7 @@ function GamePageContent() {
     setActionBusy(true);
     try {
       await respondInvite(gameId, accept);
+      notifyOthers();
       await reload();
     } catch (error) {
       setActionError(errorText(error));
@@ -547,7 +615,9 @@ function GamePageContent() {
 
   // ── El girişi görünümü ───────────────────────────────────────────────────────
 
-  if (view === 'round' && canWrite) {
+  // Yazıcı düzenler; diğer oyuncular (ve bitmiş oyunda herkes) sadece görüntüler
+  if (view === 'round') {
+    const readOnly = !canWrite;
     const rowGrid = isGroupMode ? 'relative grid grid-cols-4 gap-1.5' : 'grid grid-cols-4 gap-2';
     const Sep = () => isGroupMode
       ? <div className="absolute inset-y-0 left-1/2 w-px bg-sep -translate-x-px pointer-events-none" />
@@ -556,7 +626,7 @@ function GamePageContent() {
     const entryDealer = rounds.find((r) => r.roundNo === entryRoundNo)?.dealerSeat ?? dealerForRound(game.first_dealer_seat, entryRoundNo);
 
     return (
-      <div className="min-h-screen bg-s0 pb-24">
+      <div className={`min-h-screen bg-s0 ${readOnly ? 'pb-6' : 'pb-24'}`}>
         <div className="sticky top-0 z-10 bg-s0h backdrop-blur-md border-b border-sep">
           <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
             <button
@@ -569,13 +639,14 @@ function GamePageContent() {
               </svg>
             </button>
             <div className="flex-1 text-center">
-              <h1 className="text-l1 font-bold text-base">Round {entryRoundNo}{editingRoundNo !== null ? ' — Düzenle' : ''}</h1>
+              <h1 className="text-l1 font-bold text-base">Round {entryRoundNo}{readOnly ? ' — Detay' : editingRoundNo !== null ? ' — Düzenle' : ''}</h1>
             </div>
             <ThemeToggle />
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
+        {/* Görüntüleme modunda fieldset tüm giriş ve düğmeleri kilitler */}
+        <fieldset disabled={readOnly} className="max-w-2xl mx-auto px-4 py-4 space-y-3 min-w-0">
           <div className={`${glassCard} overflow-hidden`}>
             {isGroupMode && (
               <div className="grid grid-cols-2 px-3 pt-3 pb-1">
@@ -742,23 +813,25 @@ function GamePageContent() {
                 );
               })}
             </div>
-            {isGroupMode && !isHandFinish && (
+            {isGroupMode && !isHandFinish && !readOnly && (
               <p className="text-l3 text-xs mt-3">Grup modunda takım arkadaşının puanı otomatik 0 olur</p>
             )}
           </div>
-        </div>
+        </fieldset>
 
         {/* Yapışık Kaydet Butonu */}
-        <div className="fixed bottom-0 left-0 right-0 bg-s0h backdrop-blur-md border-t border-sep px-4 py-3">
-          <div className="max-w-2xl mx-auto">
-            <button
-              onClick={handleSubmit}
-              className="w-full py-4 rounded-xl bg-ablue hover:opacity-90 active:scale-[0.98] text-white font-bold text-base transition-all touch-manipulation"
-            >
-              {editingRoundNo !== null ? 'Değişikliği Kaydet' : 'Round\'u Kaydet'}
-            </button>
+        {!readOnly && (
+          <div className="fixed bottom-0 left-0 right-0 bg-s0h backdrop-blur-md border-t border-sep px-4 py-3">
+            <div className="max-w-2xl mx-auto">
+              <button
+                onClick={handleSubmit}
+                className="w-full py-4 rounded-xl bg-ablue hover:opacity-90 active:scale-[0.98] text-white font-bold text-base transition-all touch-manipulation"
+              >
+                {editingRoundNo !== null ? 'Değişikliği Kaydet' : 'Round\'u Kaydet'}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }
@@ -813,6 +886,14 @@ function GamePageContent() {
               <button onClick={() => setShowResults(true)} className="text-ablue text-xs font-bold flex-shrink-0">Sonuçlar</button>
             )}
           </div>
+        )}
+        {isOver && nextGameId && (
+          <button
+            onClick={() => router.push(`/game?id=${nextGameId}`)}
+            className="w-full px-4 py-3 rounded-2xl bg-ablue text-white text-sm font-bold active:scale-[0.98] transition-all"
+          >
+            Yeni oyun başladı · Oyuna geç
+          </button>
         )}
 
         {/* Oyuncu Kartları */}
@@ -902,17 +983,15 @@ function GamePageContent() {
                     );
                   })}
                   <div className="flex items-center justify-end">
-                    {canWrite && (
-                      <button
-                        onClick={() => openRoundEntry(round.roundNo)}
-                        aria-label={`Round ${round.roundNo} düzenle`}
-                        className="w-6 h-6 rounded-full bg-[var(--team1-bg)] border border-[var(--team1-border)] text-ablue flex items-center justify-center transition-colors active:scale-[0.93] touch-manipulation"
-                      >
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                          <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
-                        </svg>
-                      </button>
-                    )}
+                    <button
+                      onClick={() => openRoundEntry(round.roundNo)}
+                      aria-label={`Round ${round.roundNo} ${canWrite ? 'düzenle' : 'detayı'}`}
+                      className="w-6 h-6 rounded-full bg-[var(--team1-bg)] border border-[var(--team1-border)] text-ablue flex items-center justify-center transition-colors active:scale-[0.93] touch-manipulation"
+                    >
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1115,6 +1194,13 @@ function GamePageContent() {
   );
 }
 
+// Next.js, /game?id=A'dan /game?id=B'ye geçişte sayfayı yeniden kurmaz; eski oyunun verisi
+// ekranda kalmasın diye her oyun kendi bileşen örneğiyle açılır
+function KeyedGamePage() {
+  const gameId = useSearchParams().get('id');
+  return <GamePageContent key={gameId ?? ''} />;
+}
+
 export default function GamePage() {
   return (
     <Suspense fallback={
@@ -1122,7 +1208,7 @@ export default function GamePage() {
         <div className="text-l3 text-sm">Yükleniyor...</div>
       </div>
     }>
-      <GamePageContent />
+      <KeyedGamePage />
     </Suspense>
   );
 }

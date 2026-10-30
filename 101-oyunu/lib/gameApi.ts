@@ -353,6 +353,84 @@ export async function finishGame(gameId: string): Promise<FinishResult> {
   return data as FinishResult;
 }
 
+// ── Canlı sinyal: değişikliği diğer telefonlara anında haber ver ──────────────
+// Supabase Realtime yayını (broadcast): veritabanına dokunmaz, sadece "yeniden yükle" der.
+// Sinyal veri taşımaz; alan taraf her zaman sunucudan yetkisiyle okur. Bağlantı kurulamazsa
+// sayfalardaki düzenli kontrol yine çalışır.
+//
+// game:<id> kanalı herkese açık (misafir cihaz da izler); oyun kimliğini sadece oyuncular bilir.
+// user:<id> kanalı gizli: hesap kimlikleri sıralamada görünür, herkes dinleyebilseydi kişinin
+// ne zaman oyuna eklendiği öğrenilirdi. Sadece hesabın sahibi dinleyebilir (015_realtime_signals.sql).
+
+type Signal = { send: () => void; close: () => void };
+
+// Sinyal seli (kötü niyetli ya da art arda gelen) sunucuya istek seline dönüşmesin:
+// en fazla bu aralıkta bir yenileme; arada gelenler tek yenilemede birleşir
+const SIGNAL_MIN_GAP_MS = 2000;
+
+const broadcast = { type: 'broadcast' as const, event: 'changed', payload: {} };
+
+function openSignal(topic: string, isPrivate: boolean, onSignal: () => void): Signal {
+  if (!supabase) return { send: () => {}, close: () => {} };
+  const client = supabase;
+  let closed = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let last = 0;
+  const handle = () => {
+    if (timer || closed) return;
+    timer = setTimeout(() => {
+      timer = null;
+      last = Date.now();
+      if (!closed) onSignal();
+    }, Math.max(0, last + SIGNAL_MIN_GAP_MS - Date.now()));
+  };
+
+  let channel: ReturnType<typeof client.channel> | null = null;
+  // Gizli kanalda katılırken oturum anahtarı gerekli
+  (isPrivate ? client.realtime.setAuth().catch(() => {}) : Promise.resolve()).then(() => {
+    if (closed) return;
+    channel = client
+      .channel(topic, { config: { private: isPrivate, broadcast: { self: false } } })
+      .on('broadcast', { event: 'changed' }, handle)
+      .subscribe();
+  });
+  return {
+    send: () => { channel?.send(broadcast).catch(() => {}); },
+    close: () => {
+      closed = true;
+      if (timer) clearTimeout(timer);
+      if (channel) client.removeChannel(channel);
+    },
+  };
+}
+
+/** Oyun ekranları: el girildi, oyun bitti, davet yanıtlandı */
+export const openGameSignal = (gameId: string, onSignal: () => void) => openSignal(`game:${gameId}`, false, onSignal);
+
+/** Kullanıcının ana sayfası / bitmiş oyun ekranı: yeni oyuna eklendi */
+export const openUserSignal = (userId: string, onSignal: () => void) => openSignal(`user:${userId}`, true, onSignal);
+
+/** Tek seferlik sinyal (abone olmadan, HTTP ile gönderilir) */
+async function sendOnce(topic: string, isPrivate: boolean) {
+  if (!supabase) return;
+  const client = supabase;
+  if (client.getChannels().some((c) => c.topic === `realtime:${topic}`)) return;  // bu cihaz zaten dinliyor
+  try {
+    if (isPrivate) await client.realtime.setAuth();
+    const channel = client.channel(topic, { config: { private: isPrivate } });
+    await channel.send(broadcast).catch(() => {});
+    client.removeChannel(channel);
+  } catch {
+    // Sinyal gitmezse karşı taraf düzenli kontrolle yine görür
+  }
+}
+
+/** Oyuna eklenen hesaplara haber ver (davet / devam eden oyun listesi hemen güncellensin) */
+export const notifyUsers = (userIds: string[]) => userIds.forEach((id) => { sendOnce(`user:${id}`, true); });
+
+/** Oyun ekranındakilere haber ver (ana sayfadan davet yanıtlanınca) */
+export const notifyGame = (gameId: string) => { sendOnce(`game:${gameId}`, false); };
+
 // ── El kaydı: önce cihazdaki kuyruğa, sonra sunucuya ──────────────────────────
 // İnternet kesilse de el kaybolmaz; sunucu aynı içeriğin tekrar gönderilmesini güvenle yok sayar.
 
